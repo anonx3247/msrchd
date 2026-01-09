@@ -25,12 +25,14 @@ export class PublicationResource {
   private data: Publication;
   private citations: { from: Citation[]; to: Citation[] };
   private reviews: Review[];
+  private pendingCitationReferences: string[];
   experiment: ExperimentResource;
 
-  private constructor(data: Publication, experiment: ExperimentResource) {
+  private constructor(data: Publication, experiment: ExperimentResource, pendingCitationReferences: string[] = []) {
     this.data = data;
     this.citations = { from: [], to: [] };
     this.reviews = [];
+    this.pendingCitationReferences = pendingCitationReferences;
     this.experiment = experiment;
   }
 
@@ -262,6 +264,7 @@ export class PublicationResource {
     data: {
       title: string;
       reference: string;
+      citationReferences: string[];
     },
   ): Promise<Result<PublicationResource>> {
     const [created] = await db
@@ -277,10 +280,11 @@ export class PublicationResource {
 
     // We don't create citations until the publication gets published.
 
-    return ok(await new PublicationResource(created, experiment).finalize());
+    const resource = await new PublicationResource(created, experiment, data.citationReferences).finalize();
+    return ok(resource);
   }
 
-  async maybePublishOrReject(content: string): Promise<
+  async maybePublishOrReject(): Promise<
     "SUBMITTED" | "PUBLISHED" | "REJECTED"
   > {
     const grades = removeNulls(this.reviews.map((r) => r.grade ?? null));
@@ -292,17 +296,16 @@ export class PublicationResource {
     if (grades.some((g) => g === "REJECT")) {
       await this.reject();
     } else {
-      await this.publish(content);
+      await this.publish();
     }
 
     return this.data.status;
   }
 
-  async publish(content: string) {
-    const references = PublicationResource.extractReferences(content);
+  async publish() {
     const found = await PublicationResource.findByReferences(
       this.experiment,
-      references,
+      this.pendingCitationReferences,
     );
 
     try {

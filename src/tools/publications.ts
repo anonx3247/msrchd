@@ -296,6 +296,7 @@ ${r.content}`;
         {
           title,
           reference,
+          citationReferences: references,
         },
       );
       if (publication.isErr()) {
@@ -331,7 +332,7 @@ ${r.content}`;
         return errorToCallToolResult(reviews);
       }
       if (reviewers.length === 0) {
-        await publication.value.maybePublishOrReject(content);
+        await publication.value.maybePublishOrReject();
       }
 
       const res = publication.value.toJSON();
@@ -483,7 +484,7 @@ ${r.content}`;
         return errorToCallToolResult(review);
       }
 
-      await publication.maybePublishOrReject(publicationContent);
+      await publication.maybePublishOrReject();
 
       return {
         isError: false,
