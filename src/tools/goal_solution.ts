@@ -27,10 +27,7 @@ export async function createGoalSolutionServer(
     {
       publication: z
         .string()
-        .nullable()
-        .describe(
-          "The reference of the publication. `null` if the previous solution was proven wrong and there is no current valid solution.",
-        ),
+        .describe("The reference of the publication."),
       reason: z
         .enum([
           "no_previous",
@@ -42,26 +39,31 @@ export async function createGoalSolutionServer(
       rationale: z.string().describe("Short rationale"),
     },
     async ({ publication: reference, reason, rationale }) => {
-      const publication = reference
-        ? await PublicationResource.findByReference(experiment, reference)
-        : null;
+      const publication = await PublicationResource.findByReference(
+        experiment,
+        reference,
+      );
 
-      if (reference && !publication) {
+      if (!publication) {
         return errorToCallToolResult(
           err("not_found_error", "Publication not found"),
         );
       }
-      if (publication && publication.toJSON().status !== "PUBLISHED") {
+      if (publication.toJSON().status !== "PUBLISHED") {
         return errorToCallToolResult(
           err("invalid_parameters_error", "Publication is not published"),
         );
       }
 
-      await SolutionResource.create(experiment, agent, {
-        reason,
-        rationale,
-        publication: publication ? publication.toJSON().id : null,
-      });
+      await SolutionResource.create(
+        experiment,
+        agent.toJSON().id,
+        publication,
+        {
+          reason,
+          rationale,
+        },
+      );
 
       return {
         isError: false,

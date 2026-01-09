@@ -244,11 +244,10 @@ export const solutions = sqliteTable(
     experiment: integer("experiment")
       .notNull()
       .references(() => experiments.id),
-    // null when thre is no current solution (anymore)
-    publication: integer("publication").references(() => publications.id),
-    agent: integer("agent")
+    publication: integer("publication")
       .notNull()
-      .references(() => agents.id),
+      .references(() => publications.id),
+    agent: integer("agent").notNull(),
 
     reason: text("reason", {
       enum: [
