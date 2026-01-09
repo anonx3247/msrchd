@@ -8,7 +8,6 @@ import {
   ToolResult,
   ToolUse,
 } from "@app/models";
-import { AgentResource } from "@app/resources/agent";
 import { ExperimentResource } from "@app/resources/experiment";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { withRetries, Result, err, ok } from "@app/lib/error";
@@ -24,10 +23,17 @@ import { createServer } from "@app/tools";
 import { DEFAULT_TOOLS } from "@app/tools/constants";
 import { RunConfig } from "./config";
 import { createLLM } from "@app/models/provider";
+import { readFileSync } from "fs";
+import { join } from "path";
+
+const DEFAULT_PROMPT = readFileSync(
+  join(__dirname, "../default_prompt.md"),
+  "utf-8",
+);
 
 export class Runner {
   private experiment: ExperimentResource;
-  private agent: AgentResource;
+  private agentIndex: number;
   private mcpClients: Client[];
   private model: LLM;
 
@@ -39,12 +45,12 @@ export class Runner {
 
   private constructor(
     experiment: ExperimentResource,
-    agent: AgentResource,
+    agentIndex: number,
     mcpClients: Client[],
     model: LLM,
   ) {
     this.experiment = experiment;
-    this.agent = agent;
+    this.agentIndex = agentIndex;
     this.mcpClients = mcpClients;
     this.model = model;
 
@@ -57,12 +63,12 @@ export class Runner {
 
   public static async builder(
     experiment: ExperimentResource,
-    agent: AgentResource,
+    agentIndex: number,
     config: RunConfig,
   ): Promise<Result<Runner>> {
     const servers = await Promise.all(
-      [...agent.toJSON().tools, ...DEFAULT_TOOLS].map((t) =>
-        createServer(t, { experiment, agent, config }),
+      [...config.tools, ...DEFAULT_TOOLS].map((t) =>
+        createServer(t, { experiment, agentIndex, config }),
       ),
     );
     const clients = await Promise.all(
@@ -72,11 +78,16 @@ export class Runner {
       }),
     );
 
-    const model = createLLM(agent.toJSON().model, {
-      thinking: agent.toJSON().thinking,
+    const model = createLLM(experiment.toJSON().model, {
+      thinking: config.thinking,
     });
 
-    const runner = await Runner.initialize(experiment, agent, clients, model);
+    const runner = await Runner.initialize(
+      experiment,
+      agentIndex,
+      clients,
+      model,
+    );
     if (runner.isErr()) {
       return runner;
     }
@@ -86,15 +97,20 @@ export class Runner {
 
   public static async initialize(
     experiment: ExperimentResource,
-    agent: AgentResource,
+    agentIndex: number,
     mcpClients: Client[],
     model: LLM,
   ): Promise<Result<Runner>> {
-    const runner = new Runner(experiment, agent, mcpClients, model);
+    const runner = new Runner(
+      experiment,
+      agentIndex,
+      mcpClients,
+      model,
+    );
 
     const messages = await MessageResource.listMessagesByAgent(
       runner.experiment,
-      runner.agent.toJSON().id,
+      runner.agentIndex,
     );
 
     runner.messages = messages;
@@ -212,12 +228,12 @@ export class Runner {
     const reviews =
       await PublicationResource.listByExperimentAndReviewRequested(
         this.experiment,
-        this.agent.toJSON().id,
+        this.agentIndex,
       );
 
     const publications = await PublicationResource.listByAuthor(
       this.experiment,
-      this.agent.toJSON().id,
+      this.agentIndex,
     );
 
     const m: Message = {
@@ -243,7 +259,7 @@ This is an automated system message and there is no user available to respond. P
 
     const message = await MessageResource.create(
       this.experiment,
-      this.agent.toJSON().id,
+      this.agentIndex,
       m,
       position,
     );
@@ -365,9 +381,7 @@ This is an automated system message and there is no user available to respond. P
         tools,
       );
       if (res.isErr()) {
-        console.log(
-          "Agent: " + this.agent.toJSON().name + " " + this.agent.toJSON().id,
-        );
+        console.log("Agent: " + this.agentIndex);
         console.log(messages.length);
         messages.forEach((m) => {
           console.log(m.role);
@@ -399,7 +413,7 @@ This is an automated system message and there is no user available to respond. P
     c: TextContent | ToolUse | ToolResult | Thinking,
     messageId?: number,
   ) {
-    let out = `\x1b[1m\x1b[37m${this.agent.toJSON().name}\x1b[0m`; // name: bold white
+    let out = `\x1b[1m\x1b[37mAgent ${this.agentIndex}\x1b[0m`; // name: bold white
     if (messageId) {
       out += ` \x1b[1m\x1b[33m#${messageId}\x1b[0m`; // message id: bold yellow if available
     }
@@ -456,12 +470,10 @@ This is an automated system message and there is no user available to respond. P
       this.messages.push(newMessage.value);
     }
 
-    const systemPrompt = `\
-<goal>
-${this.experiment.toJSON().problem}
-</goal>
-
-${this.agent.toJSON().system}`;
+    const systemPrompt = DEFAULT_PROMPT.replace(
+      "{{PROBLEM}}",
+      this.experiment.toJSON().problem,
+    );
 
     const messagesForModel = await this.renderForModel(
       systemPrompt,
@@ -487,8 +499,7 @@ ${this.agent.toJSON().system}`;
 
     if (message.content.length === 0) {
       console.log(
-        `WARNING: Skipping empty agent response content for agent ${this.agent.toJSON().name
-        }`,
+        `WARNING: Skipping empty agent response content for agent ${this.agentIndex}`,
       );
       return ok(undefined);
     }
@@ -505,7 +516,7 @@ ${this.agent.toJSON().system}`;
 
     const agentMessage = await MessageResource.create(
       this.experiment,
-      this.agent.toJSON().id,
+      this.agentIndex,
       message,
       last.position() + 1,
     );
@@ -514,13 +525,13 @@ ${this.agent.toJSON().system}`;
     if (tokenUsage) {
       await TokenUsageResource.logUsage(
         this.experiment,
-        this.agent,
+        this.agentIndex,
         agentMessage,
         tokenUsage,
       );
     } else {
       console.warn(
-        `WARNING: Skipping token usage log for agent ${this.agent.toJSON().name}`,
+        `WARNING: Skipping token usage log for agent ${this.agentIndex}`,
       );
     }
 
@@ -531,7 +542,7 @@ ${this.agent.toJSON().system}`;
     if (toolResults.length > 0) {
       const toolResultsMessage = await MessageResource.create(
         this.experiment,
-        this.agent.toJSON().id,
+        this.agentIndex,
         {
           role: "user",
           content: toolResults,
@@ -559,7 +570,7 @@ ${this.agent.toJSON().system}`;
   async replayAgentMessage(messageId: number): Promise<Result<void>> {
     const agentMessage = await MessageResource.findById(
       this.experiment,
-      this.agent.toJSON().id,
+      this.agentIndex,
       messageId,
     );
 

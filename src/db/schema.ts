@@ -5,9 +5,8 @@ import {
   unique,
   index,
 } from "drizzle-orm/sqlite-core";
-import { Message, ThinkingConfig } from "@app/models";
-import { ToolName } from "@app/tools/constants";
-import { provider, Model } from "@app/models/provider";
+import { Message } from "@app/models";
+import { Model } from "@app/models/provider";
 
 export const experiments = sqliteTable(
   "experiments",
@@ -46,9 +45,7 @@ export const token_usages = sqliteTable(
     experiment: integer("experiment")
       .notNull()
       .references(() => experiments.id),
-    agent: integer("agent")
-      .notNull()
-      .references(() => agents.id),
+    agent: integer("agent").notNull(),
     message: integer("message")
       .notNull()
       .references(() => messages.id),
@@ -59,60 +56,6 @@ export const token_usages = sqliteTable(
     thinking: integer("thinking").notNull(),
   },
   (t) => [index("token_usages_idx_experiment_agent").on(t.experiment, t.agent)],
-);
-
-export const agents = sqliteTable(
-  "agents",
-  {
-    id: integer("id").primaryKey(),
-    created: integer("created", { mode: "timestamp" })
-      .notNull()
-      .$defaultFn(() => new Date()),
-    updated: integer("updated", { mode: "timestamp" })
-      .notNull()
-      .$defaultFn(() => new Date()),
-
-    experiment: integer("experiment")
-      .notNull()
-      .references(() => experiments.id),
-    name: text("name").notNull(),
-    provider: text("provider").$type<provider>().notNull(),
-    model: text("model").$type<Model>().notNull(),
-    thinking: text("thinking").$type<ThinkingConfig>().notNull(),
-    tools: text("tools", { mode: "json" }).$type<ToolName[]>(),
-  },
-  (t) => [unique().on(t.name, t.experiment)],
-);
-
-export const evolutions = sqliteTable(
-  "evolutions",
-  {
-    id: integer("id").primaryKey(),
-    created: integer("created", { mode: "timestamp" })
-      .notNull()
-      .$defaultFn(() => new Date()),
-    updated: integer("updated", { mode: "timestamp" })
-      .notNull()
-      .$defaultFn(() => new Date()),
-
-    experiment: integer("experiment")
-      .notNull()
-      .references(() => experiments.id),
-    agent: integer("agent")
-      .notNull()
-      .references(() => agents.id),
-
-    system: text("system").notNull(),
-  },
-  (t) => {
-    return [
-      index("evolutions_idx_experiment_agent_created").on(
-        t.experiment,
-        t.agent,
-        t.created,
-      ),
-    ];
-  },
 );
 
 export const messages = sqliteTable(

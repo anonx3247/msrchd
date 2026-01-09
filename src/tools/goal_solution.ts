@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { AgentResource } from "@app/resources/agent";
 import { errorToCallToolResult } from "@app/lib/mcp";
 import { PublicationResource } from "@app/resources/publication";
 import { ExperimentResource } from "@app/resources/experiment";
@@ -12,7 +11,7 @@ const SERVER_VERSION = "0.1.0";
 
 export async function createGoalSolutionServer(
   experiment: ExperimentResource,
-  agent: AgentResource,
+  agentIndex: number,
 ): Promise<McpServer> {
   const server = new McpServer({
     name: SERVER_NAME,
@@ -48,7 +47,7 @@ export async function createGoalSolutionServer(
 
       const voteResult = await SolutionResource.vote(
         experiment.toJSON().id,
-        agent.toJSON().id,
+        agentIndex,
         publication.toJSON().id,
       );
 

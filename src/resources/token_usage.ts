@@ -1,6 +1,5 @@
 import { and, eq, sum } from "drizzle-orm";
-import { token_usages, agents } from "@app/db/schema";
-import { AgentResource } from "./agent";
+import { token_usages } from "@app/db/schema";
 import { MessageResource } from "./messages";
 import { db, Tx } from "@app/db";
 import { TokenUsage } from "@app/models/index";
@@ -33,7 +32,7 @@ export class TokenUsageResource {
 
   static async agentTokenUsage(
     experiment: ExperimentResource,
-    agent: AgentResource,
+    agentIndex: number,
   ): Promise<TokenUsage> {
     const results = await db
       .select({
@@ -47,7 +46,7 @@ export class TokenUsageResource {
       .where(
         and(
           eq(token_usages.experiment, experiment.toJSON().id),
-          eq(token_usages.agent, agent.toJSON().id),
+          eq(token_usages.agent, agentIndex),
         ),
       );
 
@@ -62,56 +61,19 @@ export class TokenUsageResource {
 
   /**
    * Calculate total cost for an experiment across all agents
+   * All agents in an experiment use the same model
    */
   static async experimentCost(
     experiment: ExperimentResource,
   ): Promise<number> {
-    // Get all token usages grouped by agent
-    const agentUsages = await db
-      .select({
-        agentId: token_usages.agent,
-        total: sum(token_usages.total),
-        input: sum(token_usages.input),
-        output: sum(token_usages.output),
-        cached: sum(token_usages.cached),
-        thinking: sum(token_usages.thinking),
-      })
-      .from(token_usages)
-      .where(eq(token_usages.experiment, experiment.toJSON().id))
-      .groupBy(token_usages.agent);
-
-    let totalCost = 0;
-
-    // Calculate cost for each agent using their specific model
-    for (const agentUsage of agentUsages) {
-      const agentData = await db
-        .select()
-        .from(agents)
-        .where(eq(agents.id, agentUsage.agentId))
-        .limit(1);
-
-      if (agentData.length > 0) {
-        const tokenUsage: TokenUsage = {
-          total: Number(agentUsage.total),
-          input: Number(agentUsage.input),
-          output: Number(agentUsage.output),
-          cached: Number(agentUsage.cached),
-          thinking: Number(agentUsage.thinking),
-        };
-
-        // Calculate cost using the model's cost method
-        const llm = createLLM(agentData[0].model);
-        const cost = llm.cost([tokenUsage]);
-        totalCost += cost;
-      }
-    }
-
-    return totalCost;
+    const usage = await this.experimentTokenUsage(experiment);
+    const llm = createLLM(experiment.toJSON().model);
+    return llm.cost([usage]);
   }
 
   static async logUsage(
     experiment: ExperimentResource,
-    agent: AgentResource,
+    agentIndex: number,
     message: MessageResource,
     tokenUsage: TokenUsage,
     options?: { tx?: Tx },
@@ -121,7 +83,7 @@ export class TokenUsageResource {
       .insert(token_usages)
       .values({
         experiment: experiment.toJSON().id,
-        agent: agent.toJSON().id,
+        agent: agentIndex,
         message: message.toJSON().id,
         total: tokenUsage.total,
         input: tokenUsage.input,
