@@ -1,10 +1,11 @@
 import { db } from "@app/db";
 import { solutions } from "@app/db/schema";
-import { eq, InferSelectModel, InferInsertModel, and, desc } from "drizzle-orm";
+import { eq, InferSelectModel, and, desc } from "drizzle-orm";
 import { ExperimentResource } from "./experiment";
 import { concurrentExecutor } from "@app/lib/async";
 import { PublicationResource } from "./publication";
 import { removeNulls } from "@app/lib/utils";
+import { Result, ok, err } from "@app/lib/error";
 
 type Solution = InferSelectModel<typeof solutions>;
 
@@ -114,26 +115,30 @@ export class SolutionResource {
     );
   }
 
-  static async create(
-    experiment: ExperimentResource,
+  static async vote(
+    experimentId: number,
     agentIndex: number,
-    publication: PublicationResource,
-    data: Omit<
-      InferInsertModel<typeof solutions>,
-      "id" | "created" | "updated" | "experiment" | "agent" | "publication"
-    >,
-  ): Promise<SolutionResource> {
-    const [created] = await db
-      .insert(solutions)
-      .values({
-        ...data,
-        experiment: experiment.toJSON().id,
-        agent: agentIndex,
-        publication: publication.toJSON().id,
-      })
-      .returning();
+    publicationId: number,
+  ): Promise<Result<void>> {
+    try {
+      await db
+        .insert(solutions)
+        .values({
+          experiment: experimentId,
+          agent: agentIndex,
+          publication: publicationId,
+        })
+        .onConflictDoUpdate({
+          target: [solutions.experiment, solutions.agent],
+          set: {
+            publication: publicationId,
+          },
+        });
 
-    return new SolutionResource(created, experiment, publication);
+      return ok(undefined);
+    } catch (error) {
+      return err("resource_creation_error", "Failed to vote for solution", error);
+    }
   }
 
   toJSON() {

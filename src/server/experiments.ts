@@ -17,7 +17,6 @@ import {
   renderRuntimeMetrics,
   renderTokenUsageMetrics,
   safeGradeClass,
-  safeReasonClass,
   safeScriptJSON,
   safeStatusClass,
   sanitizeMarkdown,
@@ -360,13 +359,16 @@ export const agentOverview = async (c: Input) => {
     ${agentSolutions
       .map((sol) => {
         const solData = sol.toJSON();
-        const reasonClass = safeReasonClass(solData.reason);
         return `
         <div class="card">
-          <h3>Solution</h3>
-          <div><span class="reason-badge ${reasonClass
-          }">${sanitizeText(solData.reason.replace("_", " "))}</span></div>
-          <p>${sanitizeText(solData.rationale)}</p>
+          <h3>Solution Vote</h3>
+          ${solData.publication
+            ? `
+            <a href="/experiments/${id}/publications/${solData.publication.id}">${sanitizeText(
+              solData.publication.reference,
+            )}: ${sanitizeText(solData.publication.title)}</a>`
+            : ""
+          }
           <div class="meta">Created: ${sanitizeText(
             solData.created.toLocaleString(),
           )}</div>
@@ -866,21 +868,16 @@ export const solutionList = async (c: Input) => {
     ${experimentSolutions
       .map((sol) => {
         const solData = sol.toJSON();
-        const reasonClass = safeReasonClass(solData.reason);
         return `
         <div class="card">
-          <h3>Solution by Agent ${solData.agent}</h3>
-          <div><span class="reason-badge ${reasonClass
-          }">${sanitizeText(solData.reason.replace("_", " "))}</span>
+          <h3>Solution Vote by Agent ${solData.agent}</h3>
           ${solData.publication
             ? `
             <a href="/experiments/${id}/publications/${solData.publication.id}">${sanitizeText(
               solData.publication.reference,
-            )}</a>`
+            )}: ${sanitizeText(solData.publication.title)}</a>`
             : ""
           }
-          </div>
-          <p>${sanitizeText(solData.rationale)}</p>
           <div class="meta">Created: ${sanitizeText(
             solData.created.toLocaleString(),
           )}</div>
