@@ -341,7 +341,7 @@ export const agentOverview = async (c: Input) => {
           <h3><a href="/experiments/${id}/publications/${pubData.id}">${sanitizeText(
           pubData.title,
         )}</a></h3>
-          <div class="abstract">${sanitizeText(pubData.abstract)}</div>
+          <!-- <div class="abstract">removed</div> -->
           <div class="meta">
             <span class="status ${statusClass}">${sanitizeText(
           pubData.status,
@@ -446,7 +446,7 @@ export const publicationList = async (c: Input) => {
           <h3><a href="/experiments/${id}/publications/${pubData.id}">${sanitizeText(
           pubData.title,
         )}</a></h3>
-          <div class="abstract">${sanitizeText(pubData.abstract)}</div>
+          <!-- <div class="abstract">removed</div> -->
           <div class="meta">
             Reference: ${sanitizeText(pubData.reference)} |
             <span class="status ${statusClass}">${sanitizeText(
@@ -494,7 +494,7 @@ export const publicationDetail = async (c: Input) => {
   const publicationAuthor = sanitizeText(`Agent ${pubData.author}`);
   const publicationStatus = sanitizeText(pubData.status);
   const publicationReference = sanitizeText(pubData.reference);
-  const publicationAbstract = sanitizeText(pubData.abstract);
+  // const publicationAbstract = sanitizeText(pubData.abstract);
   const publicationCreated = sanitizeText(pubData.created.toLocaleString());
   const experimentName = sanitizeText(expData.name);
   const publicationStatusClass = safeStatusClass(pubData.status);
@@ -503,7 +503,7 @@ export const publicationDetail = async (c: Input) => {
     : [];
 
   // Check if content is a patch/diff file
-  const contentRaw = pubData.content ?? "";
+  const contentRaw = ""; // pubData.content removed
   const isPatch = isPatchContent(contentRaw);
   const renderedContent = isPatch
     ? `<div class="content diff-content">${sanitizePatchContent(contentRaw)}</div>`
@@ -522,7 +522,7 @@ export const publicationDetail = async (c: Input) => {
       <p><strong>Author:</strong> ${publicationAuthor}</p>
       <p><strong>Status:</strong> <span class="status ${publicationStatusClass}">${publicationStatus}</span></p>
       <p><strong>Reference:</strong> ${publicationReference}</p>
-      <div class="abstract"><strong>Abstract:</strong> ${publicationAbstract}</div>
+      <!-- <div class="abstract"><strong>Abstract:</strong> removed</div> -->
       <div class="meta">Created: ${publicationCreated}</div>
     </div>
     <div class="card">
@@ -626,8 +626,8 @@ export const publicationDownload = async (c: Input) => {
   markdown += `**Status:** ${pubData.status}\n`;
   markdown += `**Reference:** ${pubData.reference}\n`;
   markdown += `**Created:** ${pubData.created.toLocaleString()}\n\n`;
-  markdown += `## Abstract\n\n${pubData.abstract}\n\n`;
-  markdown += `${pubData.content ?? ""}\n\n`;
+  // markdown += `## Abstract\n\n${pubData.abstract}\n\n`;
+  // markdown += `${pubData.content ?? ""}\n\n`;
 
   if (pubData.citations.from.length > 0) {
     markdown += `## Citations From This Publication\n\n`;

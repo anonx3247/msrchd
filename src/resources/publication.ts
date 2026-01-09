@@ -12,8 +12,8 @@ import {
   getTableColumns,
 } from "drizzle-orm";
 import { ExperimentResource } from "./experiment";
-import { normalizeError, Result, err, ok } from "@app/lib/error";
-import { newID4, removeNulls } from "@app/lib/utils";
+import { Result, err, ok, normalizeError } from "@app/lib/error";
+import { removeNulls } from "@app/lib/utils";
 import { concurrentExecutor } from "@app/lib/async";
 import { assertNever } from "@app/lib/assert";
 
@@ -35,11 +35,24 @@ export class PublicationResource {
   }
 
   private async finalize(): Promise<PublicationResource> {
+    const fromCitationsQuery = db
+      .select()
+      .from(citations)
+      .where(eq(citations.from, this.data.id));
+    const toCitationsQuery = db
+      .select()
+      .from(citations)
+      .where(eq(citations.to, this.data.id));
+    const reviewsQuery = db
+      .select()
+      .from(reviews)
+      .where(eq(reviews.publication, this.data.id));
+
     const [fromCitationsResults, toCitationsResults, reviewsResults] =
       await Promise.all([
-        db.select().from(citations).where(eq(citations.from, this.data.id)),
-        db.select().from(citations).where(eq(citations.to, this.data.id)),
-        db.select().from(reviews).where(eq(reviews.publication, this.data.id)),
+        fromCitationsQuery,
+        toCitationsQuery,
+        reviewsQuery,
       ]);
 
     this.citations.from = fromCitationsResults;
@@ -229,7 +242,7 @@ export class PublicationResource {
     );
   }
 
-  private static extractReferences(content: string) {
+  static extractReferences(content: string) {
     const regex = /\[([a-z0-9]{4}(?:\s*,\s*[a-z0-9]{4})*)\]/g;
     const matches = [];
 
@@ -248,42 +261,26 @@ export class PublicationResource {
     authorIndex: number,
     data: {
       title: string;
-      abstract: string;
-      content: string;
+      reference: string;
     },
   ): Promise<Result<PublicationResource>> {
-    const references = PublicationResource.extractReferences(data.content);
-    const found = await PublicationResource.findByReferences(
-      experiment,
-      references,
-    );
-
-    const foundFilter = new Set(found.map((c) => c.toJSON().reference));
-    const notFound = references.filter((r) => !foundFilter.has(r));
-
-    if (notFound.length > 0) {
-      return err(
-        "reference_not_found_error",
-        "Reference not found in publication submission content: " +
-        notFound.join(","),
-      );
-    }
-
     const [created] = await db
       .insert(publications)
       .values({
         experiment: experiment.toJSON().id,
         author: authorIndex,
-        ...data,
-        reference: newID4(),
+        title: data.title,
+        reference: data.reference,
         status: "SUBMITTED",
       })
       .returning();
 
+    // We don't create citations until the publication gets published.
+
     return ok(await new PublicationResource(created, experiment).finalize());
   }
 
-  async maybePublishOrReject(): Promise<
+  async maybePublishOrReject(content: string): Promise<
     "SUBMITTED" | "PUBLISHED" | "REJECTED"
   > {
     const grades = removeNulls(this.reviews.map((r) => r.grade ?? null));
@@ -295,14 +292,14 @@ export class PublicationResource {
     if (grades.some((g) => g === "REJECT")) {
       await this.reject();
     } else {
-      await this.publish();
+      await this.publish(content);
     }
 
     return this.data.status;
   }
 
-  async publish() {
-    const references = PublicationResource.extractReferences(this.data.content);
+  async publish(content: string) {
+    const references = PublicationResource.extractReferences(content);
     const found = await PublicationResource.findByReferences(
       this.experiment,
       references,
@@ -338,7 +335,7 @@ export class PublicationResource {
       return err(
         "resource_update_error",
         "Failed to publish publication",
-        normalizeError(error),
+        error instanceof Error ? error : undefined,
       );
     }
   }
