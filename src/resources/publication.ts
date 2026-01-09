@@ -13,10 +13,9 @@ import {
 } from "drizzle-orm";
 import { ExperimentResource } from "./experiment";
 import { Result, err, ok } from "@app/lib/error";
-import { removeNulls, newID6 } from "@app/lib/utils";
+import { removeNulls } from "@app/lib/utils";
 import { concurrentExecutor } from "@app/lib/async";
 import { assertNever } from "@app/lib/assert";
-import { writePublicationContent, extractReferences } from "@app/tools/publications";
 
 export type Publication = InferSelectModel<typeof publications>;
 export type Review = InferSelectModel<typeof reviews>;
@@ -248,38 +247,26 @@ export class PublicationResource {
     authorIndex: number,
     data: {
       title: string;
-      content: string;
+      reference: string;
+      citations: string[];
     },
   ): Promise<Result<PublicationResource>> {
-    const reference = newID6();
-
-    try {
-      writePublicationContent(reference, data.content);
-    } catch (error) {
-      return err(
-        "reading_file_error",
-        "Failed to write publication to filesystem",
-        error,
-      );
-    }
-
     const [created] = await db
       .insert(publications)
       .values({
         experiment: experiment.toJSON().id,
         author: authorIndex,
         title: data.title,
-        reference,
+        reference: data.reference,
         status: "SUBMITTED",
       })
       .returning();
 
-    // Extract and create citations
-    const citationReferences = extractReferences(data.content);
-    if (citationReferences.length > 0) {
+    // Create citation records
+    if (data.citations.length > 0) {
       const citedPublications = await PublicationResource.findByReferences(
         experiment,
-        citationReferences,
+        data.citations,
       );
 
       if (citedPublications.length > 0) {

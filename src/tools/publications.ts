@@ -9,6 +9,7 @@ import { PUBLICATIONS_SERVER_NAME as SERVER_NAME } from "@app/tools/constants";
 import { RunConfig } from "@app/runner/config";
 import { copyFromComputer, copyToComputer } from "@app/computer/k8s";
 import { computerId } from "@app/computer";
+import { newID6 } from "@app/lib/utils";
 import fs from "fs";
 import path from "path";
 
@@ -296,19 +297,29 @@ ${r.content}`;
         .sort(() => 0.5 - Math.random())
         .slice(0, config.reviewers);
 
+      // Generate reference and write content to filesystem
+      const reference = newID6();
+
+      try {
+        writePublicationContent(reference, content);
+      } catch (error) {
+        return errorToCallToolResult(
+          err("reading_file_error", "Failed to write publication to filesystem", error),
+        );
+      }
+
       const publication = await PublicationResource.submit(
         experiment,
         agent.toJSON().id,
         {
           title,
-          content,
+          reference,
+          citations: references,
         },
       );
       if (publication.isErr()) {
         return errorToCallToolResult(publication);
       }
-
-      const reference = publication.value.toJSON().reference;
 
       if (attachments && hasComputerTool) {
         const attachmentsDir = getAttachmentPath(experiment.toJSON().id, reference);
