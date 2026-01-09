@@ -16,19 +16,11 @@ import { Result, err, ok } from "@app/lib/error";
 import { removeNulls, newID6 } from "@app/lib/utils";
 import { concurrentExecutor } from "@app/lib/async";
 import { assertNever } from "@app/lib/assert";
-import fs from "fs";
-import path from "path";
+import { writePublicationContent, extractReferences } from "@app/tools/publications";
 
 export type Publication = InferSelectModel<typeof publications>;
 export type Review = InferSelectModel<typeof reviews>;
 export type Citation = InferInsertModel<typeof citations>;
-
-function writePublicationContent(reference: string, content: string): void {
-  const publicationDir = path.join("publications", reference);
-  const publicationFile = path.join(publicationDir, "publication.md");
-  fs.mkdirSync(publicationDir, { recursive: true });
-  fs.writeFileSync(publicationFile, content, "utf-8");
-}
 
 export class PublicationResource {
   private data: Publication;
@@ -251,20 +243,6 @@ export class PublicationResource {
     );
   }
 
-  static extractReferences(content: string) {
-    const regex = /\[([a-z0-9]{4}(?:\s*,\s*[a-z0-9]{4})*)\]/g;
-    const matches = [];
-
-    let match;
-    while ((match = regex.exec(content)) !== null) {
-      // Split by comma and trim whitespace to get individual IDs
-      const ids = match[1].split(",").map((id) => id.trim());
-      matches.push(...ids);
-    }
-
-    return matches;
-  }
-
   static async submit(
     experiment: ExperimentResource,
     authorIndex: number,
@@ -297,7 +275,7 @@ export class PublicationResource {
       .returning();
 
     // Extract and create citations
-    const citationReferences = PublicationResource.extractReferences(data.content);
+    const citationReferences = extractReferences(data.content);
     if (citationReferences.length > 0) {
       const citedPublications = await PublicationResource.findByReferences(
         experiment,

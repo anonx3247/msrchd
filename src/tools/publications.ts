@@ -14,6 +14,27 @@ import path from "path";
 
 const SERVER_VERSION = "0.1.0";
 
+export function writePublicationContent(reference: string, content: string): void {
+  const publicationDir = path.join("publications", reference);
+  const publicationFile = path.join(publicationDir, "publication.md");
+  fs.mkdirSync(publicationDir, { recursive: true });
+  fs.writeFileSync(publicationFile, content, "utf-8");
+}
+
+export function extractReferences(content: string): string[] {
+  const regex = /\[([a-z0-9]{6}(?:\s*,\s*[a-z0-9]{6})*)\]/g;
+  const matches: string[] = [];
+
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    // Split by comma and trim whitespace to get individual IDs
+    const ids = match[1].split(",").map((id) => id.trim());
+    matches.push(...ids);
+  }
+
+  return matches;
+}
+
 export function getPublicationPath(reference: string): string {
   return path.join("publications", reference);
 }
@@ -245,7 +266,7 @@ ${r.content}`;
       }
 
       // Validate references in content
-      const references = PublicationResource.extractReferences(content);
+      const references = extractReferences(content);
       const found = await PublicationResource.findByReferences(
         experiment,
         references,
