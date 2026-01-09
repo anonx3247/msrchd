@@ -13,14 +13,14 @@ export async function createServer(
     experiment,
     agentIndex,
     config,
-    hasComputerTool,
   }: {
     experiment: ExperimentResource;
     agentIndex: number;
     config: RunConfig;
-    hasComputerTool: boolean;
   },
 ): Promise<McpServer> {
+  const hasComputerTool = config.tools.includes("computer");
+
   switch (tool) {
     case "computer":
       return createComputerServer(experiment, agentIndex);

@@ -34,11 +34,6 @@ const exitWithError = (err: Err<SrchdError>) => {
 const DEFAULT_AGENT_COUNT = 0;
 const DEFAULT_MODEL: Model = "claude-sonnet-4-5";
 const DEFAULT_THINKING = "low";
-const DEFAULT_SYSTEM_PROMPT = `You are a research agent working on solving the following problem:
-
-{{PROBLEM}}
-
-You have access to tools to collaborate with other agents through a publication system. Use these tools to share your findings, review others' work, and build upon collective knowledge.`;
 
 const program = new Command();
 
@@ -194,12 +189,6 @@ program
       tools.push("web");
     }
 
-    // Create system prompt by replacing {{PROBLEM}} with experiment problem
-    const systemPrompt = DEFAULT_SYSTEM_PROMPT.replace(
-      "{{PROBLEM}}",
-      experiment.toJSON().problem,
-    );
-
     // Determine which agents to run
     const agentIndices: number[] = [];
 
@@ -279,7 +268,7 @@ program
     // Build runners for all agents
     const builders = await Promise.all(
       agentIndices.map((agentIndex) =>
-        Runner.builder(experiment, agentIndex, systemPrompt, {
+        Runner.builder(experiment, agentIndex, {
           reviewers,
           tools: tools as any,
           thinking: options.thinking,

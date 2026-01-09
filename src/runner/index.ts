@@ -23,11 +23,17 @@ import { createServer } from "@app/tools";
 import { DEFAULT_TOOLS } from "@app/tools/constants";
 import { RunConfig } from "./config";
 import { createLLM } from "@app/models/provider";
+import { readFileSync } from "fs";
+import { join } from "path";
+
+const DEFAULT_PROMPT = readFileSync(
+  join(__dirname, "../default_prompt.md"),
+  "utf-8",
+);
 
 export class Runner {
   private experiment: ExperimentResource;
   private agentIndex: number;
-  private systemPrompt: string;
   private mcpClients: Client[];
   private model: LLM;
 
@@ -40,13 +46,11 @@ export class Runner {
   private constructor(
     experiment: ExperimentResource,
     agentIndex: number,
-    systemPrompt: string,
     mcpClients: Client[],
     model: LLM,
   ) {
     this.experiment = experiment;
     this.agentIndex = agentIndex;
-    this.systemPrompt = systemPrompt;
     this.mcpClients = mcpClients;
     this.model = model;
 
@@ -60,13 +64,11 @@ export class Runner {
   public static async builder(
     experiment: ExperimentResource,
     agentIndex: number,
-    systemPrompt: string,
     config: RunConfig,
   ): Promise<Result<Runner>> {
-    const hasComputerTool = config.tools.includes("computer");
     const servers = await Promise.all(
       [...config.tools, ...DEFAULT_TOOLS].map((t) =>
-        createServer(t, { experiment, agentIndex, config, hasComputerTool }),
+        createServer(t, { experiment, agentIndex, config }),
       ),
     );
     const clients = await Promise.all(
@@ -83,7 +85,6 @@ export class Runner {
     const runner = await Runner.initialize(
       experiment,
       agentIndex,
-      systemPrompt,
       clients,
       model,
     );
@@ -97,14 +98,12 @@ export class Runner {
   public static async initialize(
     experiment: ExperimentResource,
     agentIndex: number,
-    systemPrompt: string,
     mcpClients: Client[],
     model: LLM,
   ): Promise<Result<Runner>> {
     const runner = new Runner(
       experiment,
       agentIndex,
-      systemPrompt,
       mcpClients,
       model,
     );
@@ -471,12 +470,10 @@ This is an automated system message and there is no user available to respond. P
       this.messages.push(newMessage.value);
     }
 
-    const systemPrompt = `\
-<goal>
-${this.experiment.toJSON().problem}
-</goal>
-
-${this.systemPrompt}`;
+    const systemPrompt = DEFAULT_PROMPT.replace(
+      "{{PROBLEM}}",
+      this.experiment.toJSON().problem,
+    );
 
     const messagesForModel = await this.renderForModel(
       systemPrompt,
