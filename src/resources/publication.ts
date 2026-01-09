@@ -335,7 +335,7 @@ export class PublicationResource {
       return err(
         "resource_update_error",
         "Failed to publish publication",
-        error instanceof Error ? error : undefined,
+        error,
       );
     }
   }

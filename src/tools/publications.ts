@@ -286,7 +286,7 @@ ${r.content}`;
         fs.writeFileSync(publicationFile, content, "utf-8");
       } catch (error) {
         return errorToCallToolResult(
-          err("reading_file_error", "Failed to write publication to filesystem", error instanceof Error ? error : undefined),
+          err("reading_file_error", "Failed to write publication to filesystem", error),
         );
       }
 
