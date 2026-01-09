@@ -28,17 +28,8 @@ export async function createGoalSolutionServer(
       publication: z
         .string()
         .describe("The reference of the publication."),
-      reason: z
-        .enum([
-          "no_previous",
-          "previous_wrong",
-          "previous_improved",
-          "new_approach",
-        ])
-        .describe("Reason for the reporting a new solution."),
-      rationale: z.string().describe("Short rationale"),
     },
-    async ({ publication: reference, reason, rationale }) => {
+    async ({ publication: reference }) => {
       const publication = await PublicationResource.findByReference(
         experiment,
         reference,
@@ -55,15 +46,15 @@ export async function createGoalSolutionServer(
         );
       }
 
-      await SolutionResource.create(
-        experiment,
+      const voteResult = await SolutionResource.vote(
+        experiment.toJSON().id,
         agent.toJSON().id,
-        publication,
-        {
-          reason,
-          rationale,
-        },
+        publication.toJSON().id,
       );
+
+      if (voteResult.isErr()) {
+        return errorToCallToolResult(voteResult);
+      }
 
       return {
         isError: false,

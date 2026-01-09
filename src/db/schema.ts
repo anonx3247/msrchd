@@ -230,9 +230,6 @@ export const solutions = sqliteTable(
     created: integer("created", { mode: "timestamp" })
       .notNull()
       .$defaultFn(() => new Date()),
-    updated: integer("updated", { mode: "timestamp" })
-      .notNull()
-      .$defaultFn(() => new Date()),
 
     experiment: integer("experiment")
       .notNull()
@@ -241,22 +238,9 @@ export const solutions = sqliteTable(
       .notNull()
       .references(() => publications.id),
     agent: integer("agent").notNull(),
-
-    reason: text("reason", {
-      enum: [
-        "no_previous",
-        "previous_wrong",
-        "previous_improved",
-        "new_approach",
-      ],
-    }).notNull(),
-    rationale: text("content").notNull(),
   },
   (t) => [
-    index("solutions_idx_experiment_agent_created").on(
-      t.experiment,
-      t.agent,
-      t.created,
-    ),
+    unique().on(t.experiment, t.agent),
+    index("solutions_idx_experiment").on(t.experiment),
   ],
 );
