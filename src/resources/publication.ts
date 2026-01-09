@@ -13,26 +13,33 @@ import {
 } from "drizzle-orm";
 import { ExperimentResource } from "./experiment";
 import { Result, err, ok } from "@app/lib/error";
-import { removeNulls } from "@app/lib/utils";
+import { removeNulls, newID6 } from "@app/lib/utils";
 import { concurrentExecutor } from "@app/lib/async";
 import { assertNever } from "@app/lib/assert";
+import fs from "fs";
+import path from "path";
 
 export type Publication = InferSelectModel<typeof publications>;
 export type Review = InferSelectModel<typeof reviews>;
 export type Citation = InferInsertModel<typeof citations>;
 
+function writePublicationContent(reference: string, content: string): void {
+  const publicationDir = path.join("publications", reference);
+  const publicationFile = path.join(publicationDir, "publication.md");
+  fs.mkdirSync(publicationDir, { recursive: true });
+  fs.writeFileSync(publicationFile, content, "utf-8");
+}
+
 export class PublicationResource {
   private data: Publication;
   private citations: { from: Citation[]; to: Citation[] };
   private reviews: Review[];
-  private pendingCitationReferences: string[];
   experiment: ExperimentResource;
 
-  private constructor(data: Publication, experiment: ExperimentResource, pendingCitationReferences: string[] = []) {
+  private constructor(data: Publication, experiment: ExperimentResource) {
     this.data = data;
     this.citations = { from: [], to: [] };
     this.reviews = [];
-    this.pendingCitationReferences = pendingCitationReferences;
     this.experiment = experiment;
   }
 
@@ -263,24 +270,52 @@ export class PublicationResource {
     authorIndex: number,
     data: {
       title: string;
-      reference: string;
-      citationReferences: string[];
+      content: string;
     },
   ): Promise<Result<PublicationResource>> {
+    const reference = newID6();
+
+    try {
+      writePublicationContent(reference, data.content);
+    } catch (error) {
+      return err(
+        "reading_file_error",
+        "Failed to write publication to filesystem",
+        error,
+      );
+    }
+
     const [created] = await db
       .insert(publications)
       .values({
         experiment: experiment.toJSON().id,
         author: authorIndex,
         title: data.title,
-        reference: data.reference,
+        reference,
         status: "SUBMITTED",
       })
       .returning();
 
-    // We don't create citations until the publication gets published.
+    // Extract and create citations
+    const citationReferences = PublicationResource.extractReferences(data.content);
+    if (citationReferences.length > 0) {
+      const citedPublications = await PublicationResource.findByReferences(
+        experiment,
+        citationReferences,
+      );
 
-    const resource = await new PublicationResource(created, experiment, data.citationReferences).finalize();
+      if (citedPublications.length > 0) {
+        await db.insert(citations).values(
+          citedPublications.map((cited) => ({
+            experiment: experiment.toJSON().id,
+            from: created.id,
+            to: cited.toJSON().id,
+          })),
+        );
+      }
+    }
+
+    const resource = await new PublicationResource(created, experiment).finalize();
     return ok(resource);
   }
 
@@ -303,22 +338,7 @@ export class PublicationResource {
   }
 
   async publish() {
-    const found = await PublicationResource.findByReferences(
-      this.experiment,
-      this.pendingCitationReferences,
-    );
-
     try {
-      if (found.length > 0) {
-        await db.insert(citations).values(
-          found.map((c) => ({
-            experiment: this.experiment.toJSON().id,
-            from: this.data.id,
-            to: c.toJSON().id,
-          })),
-        );
-      }
-
       const [updated] = await db
         .update(publications)
         .set({

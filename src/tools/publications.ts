@@ -9,7 +9,6 @@ import { PUBLICATIONS_SERVER_NAME as SERVER_NAME } from "@app/tools/constants";
 import { RunConfig } from "@app/runner/config";
 import { copyFromComputer, copyToComputer } from "@app/computer/k8s";
 import { computerId } from "@app/computer";
-import { newID4 } from "@app/lib/utils";
 import fs from "fs";
 import path from "path";
 
@@ -276,32 +275,19 @@ ${r.content}`;
         .sort(() => 0.5 - Math.random())
         .slice(0, config.reviewers);
 
-      // Generate reference and write content to filesystem
-      const reference = newID4();
-      const publicationDir = getPublicationPath(reference);
-      const publicationFile = getPublicationFilePath(reference);
-
-      try {
-        fs.mkdirSync(publicationDir, { recursive: true });
-        fs.writeFileSync(publicationFile, content, "utf-8");
-      } catch (error) {
-        return errorToCallToolResult(
-          err("reading_file_error", "Failed to write publication to filesystem", error instanceof Error ? error : undefined),
-        );
-      }
-
       const publication = await PublicationResource.submit(
         experiment,
         agent.toJSON().id,
         {
           title,
-          reference,
-          citationReferences: references,
+          content,
         },
       );
       if (publication.isErr()) {
         return errorToCallToolResult(publication);
       }
+
+      const reference = publication.value.toJSON().reference;
 
       if (attachments && hasComputerTool) {
         const attachmentsDir = getAttachmentPath(experiment.toJSON().id, reference);

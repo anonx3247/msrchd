@@ -6,7 +6,7 @@ import { Err, err, ok, Result, SrchdError } from "./lib/error";
 import { ExperimentResource } from "./resources/experiment";
 import { AgentResource } from "./resources/agent";
 import { Runner } from "./runner";
-import { isArrayOf, isString, newID4, removeNulls } from "./lib/utils";
+import { isArrayOf, isString, newID6, removeNulls } from "./lib/utils";
 import { isThinkingConfig } from "./models";
 import { isAnthropicModel } from "./models/anthropic";
 import { isOpenAIModel } from "./models/openai";
@@ -253,9 +253,9 @@ agentCmd
       const name =
         count > 1
           ? options.name
-            ? `${options.name}-${newID4()}`
-            : `${newID4()}`
-          : (options.name ?? newID4());
+            ? `${options.name}-${newID6()}`
+            : `${newID6()}`
+          : (options.name ?? newID6());
       console.log(
         `Creating agent: ${name} for experiment: ${options.experiment}`,
       );
