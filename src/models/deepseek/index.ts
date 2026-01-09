@@ -13,7 +13,7 @@ import {
 import { PreTrainedTokenizer } from "@huggingface/transformers";
 
 import OpenAI from "openai";
-import { normalizeError, Result, err, ok } from "@app/lib/error";
+import { Result, err, ok } from "@app/lib/error";
 import { assertNever } from "@app/lib/assert";
 import { removeNulls } from "@app/lib/utils";
 import { convertToolChoice } from "../openai";
@@ -222,7 +222,7 @@ export class DeepseekLLM extends LLM {
       });
     } catch (error) {
       console.log(error);
-      return err("model_error", "Failed to run model", normalizeError(error));
+      return err("model_error", "Failed to run model", error);
     }
   }
 

@@ -12,7 +12,7 @@ import {
 } from "./index";
 
 import OpenAI from "openai";
-import { normalizeError, Result, err, ok } from "@app/lib/error";
+import { Result, err, ok } from "@app/lib/error";
 import { assertNever } from "@app/lib/assert";
 import { removeNulls } from "@app/lib/utils";
 import { convertThinking, convertToolChoice } from "./openai";
@@ -212,7 +212,7 @@ export class MoonshotAILLM extends LLM {
       });
     } catch (error) {
       console.log(error);
-      return err("model_error", "Failed to run model", normalizeError(error));
+      return err("model_error", "Failed to run model", error);
     }
   }
 
@@ -285,7 +285,7 @@ export class MoonshotAILLM extends LLM {
       return err(
         "model_error",
         "Failed to estimate token count",
-        normalizeError(error),
+        error,
       );
     }
   }
