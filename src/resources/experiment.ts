@@ -2,6 +2,7 @@ import { db } from "@app/db";
 import { experiments } from "@app/db/schema";
 import { err, ok, Result } from "@app/lib/error";
 import { eq, InferSelectModel, InferInsertModel } from "drizzle-orm";
+import { createLLM } from "@app/models/provider";
 
 type Experiment = InferSelectModel<typeof experiments>;
 
@@ -66,8 +67,37 @@ export class ExperimentResource {
     await db.delete(experiments).where(eq(experiments.id, this.data.id));
   }
 
-  // Return raw data if needed
   toJSON() {
     return this.data;
+  }
+
+  getAgentIndices(): number[] {
+    return Array.from({ length: this.data.agent_count }, (_, i) => i);
+  }
+
+  async addTokens(amount: number): Promise<void> {
+    const [updated] = await db
+      .update(experiments)
+      .set({
+        tokens: this.data.tokens + amount,
+        updated: new Date(),
+      })
+      .where(eq(experiments.id, this.data.id))
+      .returning();
+
+    this.data = updated;
+  }
+
+  async getTotalCost(): Promise<number> {
+    const llm = createLLM(this.data.model);
+    return llm.cost([
+      {
+        total: this.data.tokens,
+        input: 0,
+        output: 0,
+        cached: 0,
+        thinking: 0,
+      },
+    ]);
   }
 }
