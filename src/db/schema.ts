@@ -22,6 +22,13 @@ export const experiments = sqliteTable(
 
     name: text("name").notNull(),
     problem: text("problem").notNull(),
+
+    // New fields for srchd-mini
+    dockerfile_path: text("dockerfile_path"),
+    image_name: text("image_name"),
+    model: text("model").$type<Model>(),
+    agent_count: integer("agent_count"),
+    tokens: integer("tokens").default(0),
   },
   (t) => [unique().on(t.name)],
 );
