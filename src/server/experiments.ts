@@ -201,7 +201,7 @@ export const agentOverview = async (c: Input) => {
   );
   const agentSolutions = await SolutionResource.listByAgent(experiment, agent);
   const agentMessages = (
-    await MessageResource.listMessagesByAgent(experiment, agent)
+    await MessageResource.listMessagesByAgent(experiment, agent.toJSON().id)
   ).reverse();
 
   const agentData = agent.toJSON();

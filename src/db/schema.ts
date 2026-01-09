@@ -129,11 +129,8 @@ export const messages = sqliteTable(
     experiment: integer("experiment")
       .notNull()
       .references(() => experiments.id),
-    agent: integer("agent")
-      .notNull()
-      .references(() => agents.id),
+    agent: integer("agent").notNull(),
 
-    // 0-based position within the (experiment, agent) thread
     position: integer("position").notNull(),
 
     role: text("role", { enum: ["user", "agent"] as const })
