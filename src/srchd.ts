@@ -173,6 +173,7 @@ experimentCmd
     const experiment = await ExperimentResource.create({
       name,
       problem: problem.value,
+      model: "claude-sonnet-4-5",
     });
 
     const e = experiment.toJSON();
