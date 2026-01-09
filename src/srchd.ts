@@ -12,15 +12,7 @@ import { isAnthropicModel } from "./models/anthropic";
 import { isOpenAIModel } from "./models/openai";
 import { isGeminiModel } from "./models/gemini";
 import { isMoonshotAIModel } from "./models/moonshotai";
-import { serve } from "@hono/node-server";
-import { createApp, type BasicAuthConfig } from "./server";
 import { isMistralModel } from "./models/mistral";
-import {
-  messageMetricsByExperiment,
-  tokenUsageMetricsByExperiment,
-  publicationMetricsByExperiment,
-} from "./metrics";
-import { ExperimentMetrics } from "./metrics";
 import {
   buildComputerImage,
   dockerFile,
@@ -87,67 +79,6 @@ program
   .name("srchd")
   .description("Research experiment management CLI")
   .version("1.0.0");
-
-const metricsCmd = program.command("metrics").description("Show metrics");
-
-async function displayMetrics<M>(
-  experiment: string,
-  metricsByExperiment: (e: ExperimentResource) => Promise<ExperimentMetrics<M>>,
-): Promise<void> {
-  const res = await experimentAndAgents({ experiment });
-  if (res.isErr()) {
-    return exitWithError(res);
-  }
-  const [experimentRes] = res.value;
-  const metrics = await metricsByExperiment(experimentRes);
-  if (!metrics) {
-    return exitWithError(
-      err("not_found_error", `Experiment '${experiment}' not found.`),
-    );
-  }
-
-  console.table([metrics.experiment]);
-  const agents = [];
-  for (const [name, agentMetrics] of Object.entries(metrics.agents)) {
-    agents.push({ name, ...agentMetrics });
-  }
-  console.table(agents);
-}
-
-metricsCmd
-  .command("messages")
-  .description("Show message metrics")
-  .argument("<experiment>", "Experiment name")
-  .action(async (e) => displayMetrics(e, messageMetricsByExperiment));
-
-metricsCmd
-  .command("token-usage")
-  .description("Show token usage and cost")
-  .argument("<experiment>", "Experiment name")
-  .action(async (experiment) => {
-    const res = await experimentAndAgents({ experiment });
-    if (res.isErr()) {
-      return exitWithError(res);
-    }
-    const [experimentRes] = res.value;
-
-    await displayMetrics(experiment, tokenUsageMetricsByExperiment);
-
-    // Display cost separately
-    const cost = await TokenUsageResource.experimentCost(experimentRes);
-    const formattedCost = cost < 0.01
-      ? `$${cost.toFixed(6)}`
-      : cost < 1
-        ? `$${cost.toFixed(4)}`
-        : `$${cost.toFixed(2)}`;
-    console.log(`\nTotal Cost: ${formattedCost}`);
-  });
-
-metricsCmd
-  .command("publications")
-  .description("Calculate publication metrics")
-  .argument("<experiment>", "Experiment name")
-  .action(async (e) => displayMetrics(e, publicationMetricsByExperiment));
 
 // Experiment commands
 const experimentCmd = program
@@ -666,60 +597,6 @@ imageCmd
     } else {
       console.log(await dockerFile());
     }
-  });
-
-// Serve command
-program
-  .command("serve")
-  .description("Start the web UI server")
-  .option("-p, --port <port>", "Port to serve on", "1337")
-  .option("-a, --auth <user:password>", "Require HTTP basic auth credentials")
-  .action(async (options) => {
-    const port = parseInt(options.port);
-    if (isNaN(port) || port < 1 || port > 65535) {
-      return exitWithError(
-        err(
-          "invalid_parameters_error",
-          "Port must be a valid number between 1 and 65535",
-        ),
-      );
-    }
-
-    let authConfig: BasicAuthConfig | undefined;
-    if (options.auth) {
-      const separator = String(options.auth).indexOf(":");
-      if (separator === -1) {
-        return exitWithError(
-          err(
-            "invalid_parameters_error",
-            "Auth must be provided as user:password",
-          ),
-        );
-      }
-      const username = options.auth.slice(0, separator);
-      const password = options.auth.slice(separator + 1);
-      if (!username || !password) {
-        return exitWithError(
-          err(
-            "invalid_parameters_error",
-            "Auth must include both user and password",
-          ),
-        );
-      }
-      authConfig = { username, password };
-    }
-
-    console.log(`Starting server on http://localhost:${port}`);
-    if (authConfig) {
-      console.log(`Basic auth enabled for user '${authConfig.username}'`);
-    }
-
-    const app = createApp(authConfig);
-
-    serve({
-      fetch: app.fetch,
-      port,
-    });
   });
 
 program.parse();
