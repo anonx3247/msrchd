@@ -4,6 +4,7 @@ import { AgentResource } from "@app/resources/agent";
 import { errorToCallToolResult } from "@app/lib/mcp";
 import { PublicationResource, Review } from "@app/resources/publication";
 import { ExperimentResource } from "@app/resources/experiment";
+import { SolutionResource } from "@app/resources/solutions";
 import { err } from "@app/lib/error";
 import { PUBLICATIONS_SERVER_NAME as SERVER_NAME } from "@app/tools/constants";
 import { RunConfig } from "@app/runner/config";
@@ -445,6 +446,57 @@ ${r.content}`;
           {
             type: "text",
             text: `Review submitted for publication [${reference}].`,
+          },
+        ],
+      };
+    },
+  );
+
+  server.tool(
+    "vote_solution",
+    "Vote for a publication as the best solution to the research goal. Each agent can only have one active vote (voting again will replace the previous vote).",
+    {
+      publication: z
+        .string()
+        .describe("The reference of the publication to vote for."),
+    },
+    async ({ publication: reference }) => {
+      const publication = await PublicationResource.findByReference(
+        experiment,
+        reference,
+      );
+
+      if (!publication) {
+        return errorToCallToolResult(
+          err("not_found_error", "Publication not found"),
+        );
+      }
+
+      if (publication.toJSON().status !== "PUBLISHED") {
+        return errorToCallToolResult(
+          err(
+            "invalid_parameters_error",
+            "Can only vote for published publications",
+          ),
+        );
+      }
+
+      await SolutionResource.create(
+        experiment,
+        agent.toJSON().id,
+        publication,
+        {
+          reason: "new_approach",
+          rationale: "Voted as solution",
+        },
+      );
+
+      return {
+        isError: false,
+        content: [
+          {
+            type: "text",
+            text: `Successfully voted for publication [${reference}] as solution.`,
           },
         ],
       };
