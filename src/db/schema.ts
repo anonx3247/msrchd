@@ -157,13 +157,9 @@ export const publications = sqliteTable(
     experiment: integer("experiment")
       .notNull()
       .references(() => experiments.id),
-    author: integer("author")
-      .notNull()
-      .references(() => agents.id),
+    author: integer("author").notNull(),
 
     title: text("title").notNull(),
-    content: text("content").notNull(),
-    abstract: text("abstract").notNull(),
     status: text("status", {
       enum: ["SUBMITTED", "PUBLISHED", "REJECTED"],
     }).notNull(),
@@ -217,13 +213,10 @@ export const reviews = sqliteTable(
     publication: integer("publication")
       .notNull()
       .references(() => publications.id),
-    author: integer("author")
-      .notNull()
-      .references(() => agents.id),
+    author: integer("author").notNull(),
 
-    // null when requested by the system until submitted
     grade: text("grade", {
-      enum: ["STRONG_ACCEPT", "ACCEPT", "REJECT", "STRONG_REJECT"],
+      enum: ["ACCEPT", "REJECT"],
     }),
     content: text("content"),
   },
