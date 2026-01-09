@@ -90,7 +90,7 @@ export async function publicationMetricsByExperiment(
   return await metricsForExperiment(
     experiment,
     (e) => PublicationResource.listByExperiment(e),
-    (e, a) => PublicationResource.listByAuthor(e, a),
+    (e, a) => PublicationResource.listByAuthor(e, a.toJSON().id),
     calculatePublicationMetrics,
   );
 }

@@ -197,7 +197,7 @@ export const agentOverview = async (c: Input) => {
 
   const agentPublications = await PublicationResource.listByAuthor(
     experiment,
-    agent,
+    agent.toJSON().id,
   );
   const agentSolutions = await SolutionResource.listByAgent(
     experiment,
@@ -344,7 +344,7 @@ export const agentOverview = async (c: Input) => {
           <h3><a href="/experiments/${id}/publications/${pubData.id}">${sanitizeText(
           pubData.title,
         )}</a></h3>
-          <div class="abstract">${sanitizeText(pubData.abstract)}</div>
+          <!-- <div class="abstract">removed</div> -->
           <div class="meta">
             <span class="status ${statusClass}">${sanitizeText(
           pubData.status,
@@ -449,13 +449,13 @@ export const publicationList = async (c: Input) => {
           <h3><a href="/experiments/${id}/publications/${pubData.id}">${sanitizeText(
           pubData.title,
         )}</a></h3>
-          <div class="abstract">${sanitizeText(pubData.abstract)}</div>
+          <!-- <div class="abstract">removed</div> -->
           <div class="meta">
             Reference: ${sanitizeText(pubData.reference)} |
             <span class="status ${statusClass}">${sanitizeText(
           pubData.status,
         )}</span> |
-            Author: ${sanitizeText(pubData.author.name)} |
+            Author: ${sanitizeText(`Agent ${pubData.author}`)} |
             Created: ${sanitizeText(pubData.created.toLocaleString())} |
             Citations: ${pubData.citations.to.length} |
             Reviews: ${pubData.reviews
@@ -494,10 +494,10 @@ export const publicationDetail = async (c: Input) => {
   const pubData = publication.toJSON();
   const expData = experiment.toJSON();
   const publicationTitle = sanitizeText(pubData.title);
-  const publicationAuthor = sanitizeText(pubData.author.name);
+  const publicationAuthor = sanitizeText(`Agent ${pubData.author}`);
   const publicationStatus = sanitizeText(pubData.status);
   const publicationReference = sanitizeText(pubData.reference);
-  const publicationAbstract = sanitizeText(pubData.abstract);
+  // const publicationAbstract = sanitizeText(pubData.abstract);
   const publicationCreated = sanitizeText(pubData.created.toLocaleString());
   const experimentName = sanitizeText(expData.name);
   const publicationStatusClass = safeStatusClass(pubData.status);
@@ -506,7 +506,7 @@ export const publicationDetail = async (c: Input) => {
     : [];
 
   // Check if content is a patch/diff file
-  const contentRaw = pubData.content ?? "";
+  const contentRaw = ""; // pubData.content removed
   const isPatch = isPatchContent(contentRaw);
   const renderedContent = isPatch
     ? `<div class="content diff-content">${sanitizePatchContent(contentRaw)}</div>`
@@ -525,7 +525,7 @@ export const publicationDetail = async (c: Input) => {
       <p><strong>Author:</strong> ${publicationAuthor}</p>
       <p><strong>Status:</strong> <span class="status ${publicationStatusClass}">${publicationStatus}</span></p>
       <p><strong>Reference:</strong> ${publicationReference}</p>
-      <div class="abstract"><strong>Abstract:</strong> ${publicationAbstract}</div>
+      <!-- <div class="abstract"><strong>Abstract:</strong> removed</div> -->
       <div class="meta">Created: ${publicationCreated}</div>
     </div>
     <div class="card">
@@ -575,7 +575,7 @@ export const publicationDetail = async (c: Input) => {
         .map(
           (review) => `
         <div class="card">
-          <h3>Review by ${sanitizeText(review.author.name || "Unknown")}</h3>
+          <h3>Review by ${sanitizeText(`Agent ${review.author}` || "Unknown")}</h3>
           ${review.grade
               ? `<span class="grade ${safeGradeClass(
                 review.grade,
@@ -625,12 +625,12 @@ export const publicationDownload = async (c: Input) => {
 
   // Build markdown content
   let markdown = `# ${pubData.title}\n\n`;
-  markdown += `**Author:** ${pubData.author.name}\n`;
+  markdown += `**Author:** ${`Agent ${pubData.author}`}\n`;
   markdown += `**Status:** ${pubData.status}\n`;
   markdown += `**Reference:** ${pubData.reference}\n`;
   markdown += `**Created:** ${pubData.created.toLocaleString()}\n\n`;
-  markdown += `## Abstract\n\n${pubData.abstract}\n\n`;
-  markdown += `${pubData.content ?? ""}\n\n`;
+  // markdown += `## Abstract\n\n${pubData.abstract}\n\n`;
+  // markdown += `${pubData.content ?? ""}\n\n`;
 
   if (pubData.citations.from.length > 0) {
     markdown += `## Citations From This Publication\n\n`;
@@ -651,7 +651,7 @@ export const publicationDownload = async (c: Input) => {
   if (reviews && pubData.reviews.length > 0) {
     markdown += `## Reviews\n\n`;
     pubData.reviews.forEach((review) => {
-      markdown += `### Review by ${review.author.name || "Unknown"}\n\n`;
+      markdown += `### Review by ${`Agent ${review.author}` || "Unknown"}\n\n`;
       if (review.grade) {
         markdown += `**Grade:** ${review.grade.replace("_", " ")}\n\n`;
       }

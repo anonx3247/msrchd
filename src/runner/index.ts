@@ -212,12 +212,12 @@ export class Runner {
     const reviews =
       await PublicationResource.listByExperimentAndReviewRequested(
         this.experiment,
-        this.agent,
+        this.agent.toJSON().id,
       );
 
     const publications = await PublicationResource.listByAuthor(
       this.experiment,
-      this.agent,
+      this.agent.toJSON().id,
     );
 
     const m: Message = {
@@ -227,10 +227,10 @@ export class Runner {
           type: "text",
           text: `\
 SUBMITTED_PUBLICATIONS:
-${renderListOfPublications(publications, { withAbstract: false })}
+${renderListOfPublications(publications)}
 
 PENDING_REVIEWS (to prioritize):
-${renderListOfPublications(reviews, { withAbstract: false })}
+${renderListOfPublications(reviews)}
 
 <system>
 This is an automated system message and there is no user available to respond. Proceed autonomously, making sure to use tools as only tools have visible effects on the system. Never stay idle and always pro-actively work on furthering your research (even if your publications are under review or accepted as current best solutions). Never consider your research effort as complete.
