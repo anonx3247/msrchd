@@ -88,9 +88,10 @@ export function ok<T>(value: T): Ok<T> {
 export function err(
   code: ErrorCode,
   message: string,
-  cause?: Error | null,
+  cause?: any,
 ): Err<SrchdError> {
-  return new Err(new SrchdError(code, message, cause));
+  const errorCause = cause instanceof Error ? cause : null;
+  return new Err(new SrchdError(code, message, errorCause));
 }
 
 export function errorToString(error: unknown): string {
