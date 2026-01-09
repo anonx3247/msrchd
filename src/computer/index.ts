@@ -6,7 +6,6 @@ import {
   ensurePodRunning,
 } from "@app/lib/k8s";
 import { ExperimentResource } from "@app/resources/experiment";
-import { AgentResource } from "@app/resources/agent";
 import { podName } from "@app/lib/k8s";
 import { computerExec, ensureComputerPod } from "./k8s";
 import { DEFAULT_WORKDIR } from "./definitions";
@@ -14,9 +13,9 @@ import { Env } from "@app/agent_profile";
 
 export function computerId(
   experiment: ExperimentResource,
-  agent: AgentResource,
+  agentIndex: number,
 ) {
-  return `${experiment.toJSON().name}-${agent.toJSON().name}`;
+  return `${experiment.toJSON().name}-agent-${agentIndex}`;
 }
 
 export class Computer {

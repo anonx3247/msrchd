@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { AgentResource } from "@app/resources/agent";
 import { errorToCallToolResult } from "@app/lib/mcp";
 import { PublicationResource, Review } from "@app/resources/publication";
 import { ExperimentResource } from "@app/resources/experiment";
@@ -112,8 +111,9 @@ export const renderListOfPublications = (
 
 export async function createPublicationsServer(
   experiment: ExperimentResource,
-  agent: AgentResource,
+  agentIndex: number,
   config: RunConfig,
+  hasComputerTool: boolean,
 ): Promise<McpServer> {
   const server = new McpServer({
     name: SERVER_NAME,
@@ -231,8 +231,6 @@ ${r.content}`;
     },
   );
 
-  const hasComputerTool = agent.toJSON().tools.includes("computer");
-
   server.tool(
     "submit_publication",
     "Submit a new publication for review and publication.",
@@ -255,7 +253,7 @@ ${r.content}`;
       const pendingReviews =
         await PublicationResource.listByExperimentAndReviewRequested(
           experiment,
-          agent.toJSON().id,
+          agentIndex,
         );
       if (pendingReviews.length > 0) {
         return errorToCallToolResult(
@@ -286,8 +284,8 @@ ${r.content}`;
         );
       }
 
-      const agents = await AgentResource.listByExperiment(experiment);
-      const pool = agents.filter((a) => a.toJSON().id !== agent.toJSON().id);
+      const agentIndices = experiment.getAgentIndices();
+      const pool = agentIndices.filter((idx) => idx !== agentIndex);
       if (pool.length < config.reviewers) {
         return errorToCallToolResult(
           err("publication_error", "Not enough reviewers available"),
@@ -310,7 +308,7 @@ ${r.content}`;
 
       const publication = await PublicationResource.submit(
         experiment,
-        agent.toJSON().id,
+        agentIndex,
         {
           title,
           reference,
@@ -332,7 +330,7 @@ ${r.content}`;
         for (const attachmentPath of attachments) {
           const localFilePath = getAttachmentPath(experiment.toJSON().id, reference, attachmentPath);
           const copyRes = await copyFromComputer(
-            computerId(experiment, agent),
+            computerId(experiment, agentIndex),
             attachmentPath,
             localFilePath,
           );
@@ -343,9 +341,7 @@ ${r.content}`;
         }
       }
 
-      const reviews = await publication.value.requestReviewers(
-        reviewers.map((r) => r.toJSON().id),
-      );
+      const reviews = await publication.value.requestReviewers(reviewers);
       if (reviews.isErr()) {
         return errorToCallToolResult(reviews);
       }
@@ -395,7 +391,7 @@ ${r.content}`;
         }
 
         const copyRes = await copyToComputer(
-          computerId(experiment, agent),
+          computerId(experiment, agentIndex),
           attachmentsDir,
           undefined,
           "publications",
@@ -426,7 +422,7 @@ ${r.content}`;
       const publications =
         await PublicationResource.listByExperimentAndReviewRequested(
           experiment,
-          agent.toJSON().id,
+          agentIndex,
         );
 
       return {
@@ -448,7 +444,7 @@ ${r.content}`;
     async () => {
       const publications = await PublicationResource.listByAuthor(
         experiment,
-        agent.toJSON().id,
+        agentIndex,
       );
 
       return {
@@ -493,7 +489,7 @@ ${r.content}`;
         );
       }
 
-      const review = await publication.submitReview(agent.toJSON().id, {
+      const review = await publication.submitReview(agentIndex, {
         grade,
         content,
       });
