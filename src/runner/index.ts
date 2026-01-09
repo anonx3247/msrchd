@@ -212,12 +212,12 @@ export class Runner {
     const reviews =
       await PublicationResource.listByExperimentAndReviewRequested(
         this.experiment,
-        this.agent,
+        this.agent.toJSON().id,
       );
 
     const publications = await PublicationResource.listByAuthor(
       this.experiment,
-      this.agent,
+      this.agent.toJSON().id,
     );
 
     const m: Message = {

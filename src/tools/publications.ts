@@ -16,7 +16,7 @@ const SERVER_VERSION = "0.1.0";
 
 export const reviewHeader = (review: Review) => {
   return `\
-reviewer=${review.author.name}
+reviewer=Agent ${review.author}
 grade=${review.grade ?? "PENDING"}`;
 };
 
@@ -47,7 +47,7 @@ export const publicationHeader = (
     `\
 reference=[${publication.toJSON().reference}]
 title=${publication.toJSON().title}
-author=${publication.toJSON().author.name}
+author=Agent ${publication.toJSON().author}
 reviews:${publication
       .toJSON()
       .reviews.map((r) => `${r.grade ?? "PENDING"}`)
@@ -229,7 +229,7 @@ ${r.content}`;
       const pendingReviews =
         await PublicationResource.listByExperimentAndReviewRequested(
           experiment,
-          agent,
+          agent.toJSON().id,
         );
       if (pendingReviews.length > 0) {
         return errorToCallToolResult(
@@ -251,11 +251,15 @@ ${r.content}`;
         .sort(() => 0.5 - Math.random())
         .slice(0, config.reviewers);
 
-      const publication = await PublicationResource.submit(experiment, agent, {
-        title,
-        abstract,
-        content,
-      });
+      const publication = await PublicationResource.submit(
+        experiment,
+        agent.toJSON().id,
+        {
+          title,
+          abstract,
+          content,
+        },
+      );
       if (publication.isErr()) {
         return errorToCallToolResult(publication);
       }
@@ -283,7 +287,9 @@ ${r.content}`;
         }
       }
 
-      const reviews = await publication.value.requestReviewers(reviewers);
+      const reviews = await publication.value.requestReviewers(
+        reviewers.map((r) => r.toJSON().id),
+      );
       if (reviews.isErr()) {
         return errorToCallToolResult(reviews);
       }
@@ -364,7 +370,7 @@ ${r.content}`;
       const publications =
         await PublicationResource.listByExperimentAndReviewRequested(
           experiment,
-          agent,
+          agent.toJSON().id,
         );
 
       return {
@@ -388,7 +394,7 @@ ${r.content}`;
     async () => {
       const publications = await PublicationResource.listByAuthor(
         experiment,
-        agent,
+        agent.toJSON().id,
       );
 
       return {
@@ -413,7 +419,7 @@ ${r.content}`;
         .string()
         .describe("The reference of the publication to review."),
       grade: z
-        .enum(["STRONG_ACCEPT", "ACCEPT", "REJECT", "STRONG_REJECT"])
+        .enum(["ACCEPT", "REJECT"])
         .describe("Grade for the publication."),
       content: z.string().describe("Content of the review."),
     },
@@ -428,7 +434,7 @@ ${r.content}`;
         );
       }
 
-      const review = await publication.submitReview(agent, {
+      const review = await publication.submitReview(agent.toJSON().id, {
         grade,
         content,
       });
