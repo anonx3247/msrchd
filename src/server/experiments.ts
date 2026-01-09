@@ -199,7 +199,10 @@ export const agentOverview = async (c: Input) => {
     experiment,
     agent,
   );
-  const agentSolutions = await SolutionResource.listByAgent(experiment, agent);
+  const agentSolutions = await SolutionResource.listByAgent(
+    experiment,
+    agent.toJSON().id,
+  );
   const agentMessages = (
     await MessageResource.listMessagesByAgent(experiment, agent)
   ).reverse();
@@ -866,7 +869,7 @@ export const solutionList = async (c: Input) => {
         const reasonClass = safeReasonClass(solData.reason);
         return `
         <div class="card">
-          <h3>Solution by ${sanitizeText(solData.agent.name)}</h3>
+          <h3>Solution by Agent ${solData.agent}</h3>
           <div><span class="reason-badge ${reasonClass
           }">${sanitizeText(solData.reason.replace("_", " "))}</span>
           ${solData.publication

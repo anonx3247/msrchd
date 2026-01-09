@@ -2,61 +2,30 @@ import { db } from "@app/db";
 import { solutions } from "@app/db/schema";
 import { eq, InferSelectModel, InferInsertModel, and, desc } from "drizzle-orm";
 import { ExperimentResource } from "./experiment";
-import { Agent, AgentResource } from "./agent";
 import { concurrentExecutor } from "@app/lib/async";
 import { PublicationResource } from "./publication";
-import { DEFAULT_TOOLS } from "@app/tools/constants";
+import { removeNulls } from "@app/lib/utils";
 
 type Solution = InferSelectModel<typeof solutions>;
 
 export class SolutionResource {
   private data: Solution;
-  private agent: Agent;
-  private publication: PublicationResource | null = null;
+  private publication: PublicationResource;
   experiment: ExperimentResource;
 
-  private constructor(data: Solution, experiment: ExperimentResource) {
+  private constructor(
+    data: Solution,
+    experiment: ExperimentResource,
+    publication: PublicationResource,
+  ) {
     this.data = data;
-    this.agent = {
-      id: 0,
-      name: "",
-      created: new Date(),
-      updated: new Date(),
-      experiment: experiment.toJSON().id,
-      provider: "anthropic" as const,
-      model: "claude-sonnet-4-5" as const,
-      thinking: "low" as const,
-      tools: DEFAULT_TOOLS,
-    };
     this.experiment = experiment;
-  }
-
-  private async finalize(): Promise<SolutionResource> {
-    const [agent, publication] = await Promise.all([
-      AgentResource.findById(this.experiment, this.data.agent),
-      (async () => {
-        if (this.data.publication) {
-          return await PublicationResource.findById(
-            this.experiment,
-            this.data.publication,
-          );
-        }
-        return null;
-      })(),
-    ]);
-
-    if (agent) {
-      this.agent = agent.toJSON();
-    }
-    if (publication) {
-      this.publication = publication;
-    }
-    return this;
+    this.publication = publication;
   }
 
   static async findLatestByAgent(
     experiment: ExperimentResource,
-    agent: AgentResource,
+    agentIndex: number,
   ): Promise<SolutionResource | null> {
     const [result] = await db
       .select()
@@ -64,7 +33,7 @@ export class SolutionResource {
       .where(
         and(
           eq(solutions.experiment, experiment.toJSON().id),
-          eq(solutions.agent, agent.toJSON().id),
+          eq(solutions.agent, agentIndex),
         ),
       )
       .orderBy(desc(solutions.created))
@@ -74,12 +43,20 @@ export class SolutionResource {
       return null;
     }
 
-    return await new SolutionResource(result, experiment).finalize();
+    const publication = await PublicationResource.findById(
+      experiment,
+      result.publication,
+    );
+    if (!publication) {
+      return null;
+    }
+
+    return new SolutionResource(result, experiment, publication);
   }
 
   static async listByAgent(
     experiment: ExperimentResource,
-    agent: AgentResource,
+    agentIndex: number,
   ): Promise<SolutionResource[]> {
     const results = await db
       .select()
@@ -87,15 +64,26 @@ export class SolutionResource {
       .where(
         and(
           eq(solutions.experiment, experiment.toJSON().id),
-          eq(solutions.agent, agent.toJSON().id),
+          eq(solutions.agent, agentIndex),
         ),
       )
       .orderBy(desc(solutions.created));
 
-    return await concurrentExecutor(
-      results,
-      async (sol) => await new SolutionResource(sol, experiment).finalize(),
-      { concurrency: 8 },
+    return removeNulls(
+      await concurrentExecutor(
+        results,
+        async (sol) => {
+          const publication = await PublicationResource.findById(
+            experiment,
+            sol.publication,
+          );
+          if (!publication) {
+            return null;
+          }
+          return new SolutionResource(sol, experiment, publication);
+        },
+        { concurrency: 8 },
+      ),
     );
   }
 
@@ -108,19 +96,31 @@ export class SolutionResource {
       .where(and(eq(solutions.experiment, experiment.toJSON().id)))
       .orderBy(desc(solutions.created));
 
-    return await concurrentExecutor(
-      results,
-      async (sol) => await new SolutionResource(sol, experiment).finalize(),
-      { concurrency: 8 },
+    return removeNulls(
+      await concurrentExecutor(
+        results,
+        async (sol) => {
+          const publication = await PublicationResource.findById(
+            experiment,
+            sol.publication,
+          );
+          if (!publication) {
+            return null;
+          }
+          return new SolutionResource(sol, experiment, publication);
+        },
+        { concurrency: 8 },
+      ),
     );
   }
 
   static async create(
     experiment: ExperimentResource,
-    agent: AgentResource,
+    agentIndex: number,
+    publication: PublicationResource,
     data: Omit<
       InferInsertModel<typeof solutions>,
-      "id" | "created" | "updated" | "experiment" | "agent"
+      "id" | "created" | "updated" | "experiment" | "agent" | "publication"
     >,
   ): Promise<SolutionResource> {
     const [created] = await db
@@ -128,17 +128,18 @@ export class SolutionResource {
       .values({
         ...data,
         experiment: experiment.toJSON().id,
-        agent: agent.toJSON().id,
+        agent: agentIndex,
+        publication: publication.toJSON().id,
       })
       .returning();
-    return await new SolutionResource(created, experiment).finalize();
+
+    return new SolutionResource(created, experiment, publication);
   }
 
   toJSON() {
     return {
       ...this.data,
-      agent: this.agent,
-      publication: this.publication ? this.publication.toJSON() : null,
+      publication: this.publication.toJSON(),
     };
   }
 }
