@@ -94,7 +94,7 @@ export class Runner {
 
     const messages = await MessageResource.listMessagesByAgent(
       runner.experiment,
-      runner.agent,
+      runner.agent.toJSON().id,
     );
 
     runner.messages = messages;
@@ -243,7 +243,7 @@ This is an automated system message and there is no user available to respond. P
 
     const message = await MessageResource.create(
       this.experiment,
-      this.agent,
+      this.agent.toJSON().id,
       m,
       position,
     );
@@ -505,7 +505,7 @@ ${this.agent.toJSON().system}`;
 
     const agentMessage = await MessageResource.create(
       this.experiment,
-      this.agent,
+      this.agent.toJSON().id,
       message,
       last.position() + 1,
     );
@@ -531,7 +531,7 @@ ${this.agent.toJSON().system}`;
     if (toolResults.length > 0) {
       const toolResultsMessage = await MessageResource.create(
         this.experiment,
-        this.agent,
+        this.agent.toJSON().id,
         {
           role: "user",
           content: toolResults,
@@ -559,7 +559,7 @@ ${this.agent.toJSON().system}`;
   async replayAgentMessage(messageId: number): Promise<Result<void>> {
     const agentMessage = await MessageResource.findById(
       this.experiment,
-      this.agent,
+      this.agent.toJSON().id,
       messageId,
     );
 

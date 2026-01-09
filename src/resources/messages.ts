@@ -2,7 +2,6 @@ import { db, Tx } from "@app/db";
 import { messages } from "@app/db/schema";
 import { eq, InferSelectModel, and, asc } from "drizzle-orm";
 import { ExperimentResource } from "./experiment";
-import { AgentResource } from "./agent";
 import { Message } from "@app/models";
 
 export class MessageResource {
@@ -19,7 +18,7 @@ export class MessageResource {
 
   static async findById(
     experiment: ExperimentResource,
-    agent: AgentResource,
+    agentIndex: number,
     id: number,
   ): Promise<MessageResource | null> {
     const result = await db
@@ -28,7 +27,7 @@ export class MessageResource {
       .where(
         and(
           eq(messages.experiment, experiment.toJSON().id),
-          eq(messages.agent, agent.toJSON().id),
+          eq(messages.agent, agentIndex),
           eq(messages.id, id),
         ),
       )
@@ -39,7 +38,7 @@ export class MessageResource {
 
   static async listMessagesByAgent(
     experiment: ExperimentResource,
-    agent: AgentResource,
+    agentIndex: number,
   ): Promise<MessageResource[]> {
     const results = await db
       .select()
@@ -47,7 +46,7 @@ export class MessageResource {
       .where(
         and(
           eq(messages.experiment, experiment.toJSON().id),
-          eq(messages.agent, agent.toJSON().id),
+          eq(messages.agent, agentIndex),
         ),
       )
       .orderBy(asc(messages.position));
@@ -69,7 +68,7 @@ export class MessageResource {
 
   static async create(
     experiment: ExperimentResource,
-    agent: AgentResource,
+    agentIndex: number,
     message: Message,
     positon: number,
     options?: { tx?: Tx },
@@ -79,7 +78,7 @@ export class MessageResource {
       .insert(messages)
       .values({
         experiment: experiment.toJSON().id,
-        agent: agent.toJSON().id,
+        agent: agentIndex,
         ...message,
         position: positon,
       })

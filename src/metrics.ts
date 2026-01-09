@@ -53,7 +53,7 @@ export async function messageMetricsByExperiment(
   return metricsForExperiment(
     experiment,
     async (e) => MessageResource.listMessagesByExperiment(e),
-    async (e, a) => MessageResource.listMessagesByAgent(e, a),
+    async (e, a) => MessageResource.listMessagesByAgent(e, a.toJSON().id),
     calculateMessageMetrics,
   );
 }
