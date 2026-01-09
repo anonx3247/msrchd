@@ -4,30 +4,26 @@ import { Command } from "commander";
 import { readFileContent } from "./lib/fs";
 import { Err, err, ok, Result, SrchdError } from "./lib/error";
 import { ExperimentResource } from "./resources/experiment";
-import { AgentResource } from "./resources/agent";
 import { Runner } from "./runner";
-import { isArrayOf, isString, newID6, removeNulls } from "./lib/utils";
+import { isArrayOf, isString, removeNulls } from "./lib/utils";
 import { isThinkingConfig } from "./models";
-import { isAnthropicModel } from "./models/anthropic";
-import { isOpenAIModel } from "./models/openai";
-import { isGeminiModel } from "./models/gemini";
-import { isMoonshotAIModel } from "./models/moonshotai";
-import { isMistralModel } from "./models/mistral";
 import {
   buildComputerImage,
   dockerFile,
   dockerFileForIdentity,
 } from "./computer/image";
 import { Computer, computerId } from "./computer";
-import { providerFromModel } from "./models/provider";
 import { copyToComputer } from "./computer/k8s";
-import {
-  AgentProfile,
-  getAgentProfile,
-  listAgentProfiles,
-} from "./agent_profile";
-import { isDeepseekModel } from "./models/deepseek";
 import { TokenUsageResource } from "./resources/token_usage";
+import { PublicationResource } from "./resources/publication";
+import {
+  getPublicationContent,
+  publicationHeader,
+  reviewHeader,
+} from "./tools/publications";
+import { Model, isModel } from "./models/provider";
+import fs from "fs";
+import path from "path";
 
 const exitWithError = (err: Err<SrchdError>) => {
   console.error(
@@ -39,39 +35,15 @@ const exitWithError = (err: Err<SrchdError>) => {
   process.exit(1);
 };
 
-async function experimentAndAgents({
-  experiment,
-  agent,
-}: {
-  experiment: string;
-  agent?: string;
-}): Promise<Result<[ExperimentResource, AgentResource[]]>> {
-  const experimentRes = await ExperimentResource.findByName(experiment);
-  if (experimentRes.isErr()) {
-    return experimentRes;
-  }
-  if (!agent) {
-    return ok([experimentRes.value, []]);
-  }
-
-  const agentResources: AgentResource[] = [];
-
-  if (agent === "all") {
-    agentResources.push(
-      ...(await AgentResource.listByExperiment(experimentRes.value)),
-    );
-    return ok([experimentRes.value, agentResources]);
-  }
-
-  const agentRes = await AgentResource.findByName(experimentRes.value, agent);
-  if (agentRes.isErr()) {
-    return agentRes;
-  }
-  agentResources.push(agentRes.value);
-  return ok([experimentRes.value, agentResources]);
-}
-
 const DEFAULT_REVIEWERS_COUNT = 4;
+const DEFAULT_AGENT_COUNT = 0;
+const DEFAULT_MODEL: Model = "claude-sonnet-4-5";
+const DEFAULT_THINKING = "low";
+const DEFAULT_SYSTEM_PROMPT = `You are a research agent working on solving the following problem:
+
+{{PROBLEM}}
+
+You have access to tools to collaborate with other agents through a publication system. Use these tools to share your findings, review others' work, and build upon collective knowledge.`;
 
 const program = new Command();
 
@@ -92,6 +64,20 @@ experimentCmd
     "-p, --problem <problem_file>",
     "Problem description file path",
   )
+  .option(
+    "-m, --model <model>",
+    "AI model to use for all agents",
+    DEFAULT_MODEL,
+  )
+  .option(
+    "-n, --agent-count <count>",
+    "Number of agents in the experiment",
+    DEFAULT_AGENT_COUNT.toString(),
+  )
+  .option(
+    "-d, --dockerfile <path>",
+    "Optional path to Dockerfile for agent computer environment",
+  )
   .action(async (name, options) => {
     console.log(`Creating experiment: ${name}`);
 
@@ -101,10 +87,41 @@ experimentCmd
       return exitWithError(problem);
     }
 
+    // Validate model
+    if (!isModel(options.model)) {
+      return exitWithError(
+        err("invalid_parameters_error", `Invalid model: ${options.model}`),
+      );
+    }
+
+    // Validate agent count
+    const agentCount = parseInt(options.agentCount);
+    if (isNaN(agentCount) || agentCount < 1) {
+      return exitWithError(
+        err(
+          "invalid_parameters_error",
+          "Agent count must be a positive integer",
+        ),
+      );
+    }
+
+    // Validate dockerfile if provided
+    let dockerfilePath: string | undefined;
+    if (options.dockerfile) {
+      if (!fs.existsSync(options.dockerfile)) {
+        return exitWithError(
+          err("not_found_error", `Dockerfile not found: ${options.dockerfile}`),
+        );
+      }
+      dockerfilePath = path.resolve(options.dockerfile);
+    }
+
     const experiment = await ExperimentResource.create({
       name,
       problem: problem.value,
-      model: "claude-sonnet-4-5",
+      model: options.model,
+      agent_count: agentCount,
+      dockerfile_path: dockerfilePath,
     });
 
     const e = experiment.toJSON();
@@ -133,247 +150,116 @@ experimentCmd
     );
   });
 
-// Agent commands
-const agentCmd = program.command("agent").description("Manage agents");
 
-agentCmd.command("profiles").action(async () => {
-  const profiles = await listAgentProfiles();
-  if (profiles.isErr()) {
-    return exitWithError(profiles);
-  }
-  for (const profile of profiles.value) {
-    console.log(`${profile.name}: ${profile.description}`);
-  }
-});
-
-agentCmd
-  .command("create")
-  .description("Create a new agent")
-  .requiredOption("-e, --experiment <experiment>", "Experiment name")
-  .option("-n, --name <name>", "Agent name")
-  .option("-m, --model <model>", "AI model", "claude-sonnet-4-5")
-  .option(
-    "-t, --thinking <thinking>",
-    "Thinking configuration (none | low | high)",
-    "low",
-  )
-  .option(
-    "-c, --count <number>",
-    "Number of agents to create (name used as prefix)",
-    "1",
-  )
-  .requiredOption("-p, --profile <profile>", "Agent profile")
-  .action(async (options) => {
-    // Find the experiment first
-    const res = await experimentAndAgents({ experiment: options.experiment });
-    if (res.isErr()) {
-      return exitWithError(res);
-    }
-    const [experiment] = res.value;
-
-    const count = parseInt(options.count);
-    if (isNaN(count) || count < 1) {
-      return exitWithError(
-        err("invalid_parameters_error", `Count must be a positive integer.`),
-      );
-    }
-
-    const agents = [];
-
-    for (let i = 0; i < count; i++) {
-      const name =
-        count > 1
-          ? options.name
-            ? `${options.name}-${newID6()}`
-            : `${newID6()}`
-          : (options.name ?? newID6());
-      console.log(
-        `Creating agent: ${name} for experiment: ${options.experiment}`,
-      );
-      const profileRes = await getAgentProfile(options.profile);
-      if (profileRes.isErr()) {
-        return exitWithError(profileRes);
-      }
-      const profile = profileRes.value;
-      const model = options.model;
-      const thinking = options.thinking;
-      const tools = profile.tools;
-
-      if (
-        !(
-          isAnthropicModel(model) ||
-          isOpenAIModel(model) ||
-          isGeminiModel(model) ||
-          isMistralModel(model) ||
-          isMoonshotAIModel(model) ||
-          isDeepseekModel(model)
-        )
-      ) {
-        return exitWithError(
-          err("invalid_parameters_error", `Model '${model}' is not supported.`),
-        );
-      }
-      const provider = providerFromModel(model);
-
-      if (!isThinkingConfig(thinking)) {
-        return exitWithError(
-          err(
-            "invalid_parameters_error",
-            `Thinking configuration '${thinking}' is not valid. Use 'none', 'low', or 'high'.`,
-          ),
-        );
-      }
-
-      const agent = await AgentResource.create(
-        experiment,
-        {
-          name,
-          model,
-          provider,
-          thinking,
-          tools,
-        },
-        { system: profile.prompt },
-      );
-      agents.push(agent);
-
-      if (tools.includes("computer")) {
-        await Computer.create(
-          computerId(experiment, agent),
-          undefined,
-          profile.imageName,
-          profile.env,
-        );
-      }
-    }
-
-    console.table(
-      agents.map((agent) => {
-        const a = agent.toJSON();
-        a.system =
-          a.system.substring(0, 32) + (a.system.length > 32 ? "..." : "");
-        // @ts-expect-error: clean-up hack
-        delete a.evolutions;
-        return a;
-      }),
-    );
-  });
-
-agentCmd
-  .command("list")
-  .description("List agents for a given experiment")
-  .requiredOption("-e, --experiment <experiment>", "Experiment name")
-  .action(async (options) => {
-    // Find the experiment first
-    const res = await experimentAndAgents({
-      experiment: options.experiment,
-      agent: "all",
-    });
-    if (res.isErr()) {
-      return exitWithError(res);
-    }
-    const [_experiment, agents] = res.value;
-
-    if (agents.length === 0) {
-      return exitWithError(err("not_found_error", "No agents found."));
-    }
-
-    console.table(
-      agents.map((agent) => {
-        const a = agent.toJSON();
-        a.system =
-          a.system.substring(0, 32) + (a.system.length > 32 ? "..." : "");
-        // @ts-expect-error: clean-up hack
-        delete a.evolutions;
-        return a;
-      }),
-    );
-  });
-
-agentCmd
-  .command("show <name>")
-  .description("Show agent details")
-  .requiredOption("-e, --experiment <experiment>", "Experiment name")
-  .action(async (name, options) => {
-    // Find the experiment first
-    const res = await experimentAndAgents({
-      experiment: options.experiment,
-      agent: name,
-    });
-    if (res.isErr()) {
-      return exitWithError(res);
-    }
-    const [_experiment, [agent]] = res.value;
-
-    const a = agent.toJSON();
-    a.system = a.system.substring(0, 32) + (a.system.length > 32 ? "..." : "");
-    // @ts-expect-error: clean-up hack
-    delete a.evolutions;
-    console.table([a]);
-  });
-
-agentCmd
-  .command("delete <name>")
-  .description("Delete an agent")
-  .requiredOption("-e, --experiment <experiment>", "Experiment name")
-  .action(async (name, options) => {
-    // Find the experiment first
-    const res = await experimentAndAgents({
-      experiment: options.experiment,
-      agent: name,
-    });
-    if (res.isErr()) {
-      return exitWithError(res);
-    }
-    const [_experiment, [agent]] = res.value;
-
-    await agent.delete();
-    console.log(`Agent '${name}' deleted successfully.`);
-  });
-
-agentCmd
-  .command("run <name>")
-  .description("Run an agent")
-  .requiredOption("-e, --experiment <experiment>", "Experiment name")
-  .option(
-    "-r, --reviewers <reviewers>",
-    "Number of required reviewers for each publication",
-    DEFAULT_REVIEWERS_COUNT.toString(),
-  )
+// Run command - runs all agents in an experiment
+program
+  .command("run <experiment>")
+  .description("Run all agents in an experiment")
   .option("-p, --path <path...>", "Add a file or directory to the computer")
-  .option("-t, --tick", "Run one tick only")
-  .option("--max-tokens <tokens>", "Max tokens (in millions) before stopping run")
+  .option(
+    "-t, --tick <agent>",
+    "Run one tick for a specific agent (by index)",
+  )
   .option("--max-cost <cost>", "Max cost (in dollars) before stopping run")
-  .action(async (name, options) => {
-    const res = await experimentAndAgents({
-      experiment: options.experiment,
-      agent: name,
-    });
-    if (res.isErr()) {
-      return exitWithError(res);
+  .option(
+    "--thinking <thinking>",
+    "Thinking configuration (none | low | high)",
+    DEFAULT_THINKING,
+  )
+  .option("--no-computer", "Disable computer tool (enabled by default)")
+  .option("--no-web", "Disable web tool (enabled by default)")
+  .action(async (experimentName, options) => {
+    // Find experiment
+    const experimentRes = await ExperimentResource.findByName(experimentName);
+    if (experimentRes.isErr()) {
+      return exitWithError(experimentRes);
     }
-    const [experiment, agents] = res.value;
+    const experiment = experimentRes.value;
+    const agentCount = experiment.toJSON().agent_count;
 
-    let reviewers = DEFAULT_REVIEWERS_COUNT;
-    if (options.reviewers) {
-      reviewers = parseInt(options.reviewers);
-      if (isNaN(reviewers) || reviewers < 0) {
+    // Calculate reviewers: 4 unless we have less than 5 agents
+    const reviewers = agentCount >= 5 ? 4 : agentCount - 1;
+
+    // Parse thinking
+    if (!isThinkingConfig(options.thinking)) {
+      return exitWithError(
+        err(
+          "invalid_parameters_error",
+          `Invalid thinking config: ${options.thinking}`,
+        ),
+      );
+    }
+
+    // Determine tools: computer and web are enabled by default
+    const tools: string[] = [];
+    if (options.computer !== false) {
+      tools.push("computer");
+    }
+    if (options.web !== false) {
+      tools.push("web");
+    }
+
+    // Create system prompt by replacing {{PROBLEM}} with experiment problem
+    const systemPrompt = DEFAULT_SYSTEM_PROMPT.replace(
+      "{{PROBLEM}}",
+      experiment.toJSON().problem,
+    );
+
+    // Determine which agents to run
+    const agentIndices: number[] = [];
+
+    if (options.tick !== undefined) {
+      // Run single tick for specific agent
+      const agentIndex = parseInt(options.tick);
+      if (isNaN(agentIndex) || agentIndex < 0 || agentIndex >= agentCount) {
         return exitWithError(
           err(
             "invalid_parameters_error",
-            "Reviewers must be a valid integer greater than 0",
+            `Invalid agent index: ${options.tick}. Must be between 0 and ${agentCount - 1}`,
           ),
         );
       }
+      agentIndices.push(agentIndex);
+    } else {
+      // Run all agents
+      for (let i = 0; i < agentCount; i++) {
+        agentIndices.push(i);
+      }
     }
 
+    // Build Docker image if computer tool is enabled
+    const hasComputer = tools.includes("computer");
+    if (hasComputer) {
+      const experimentData = experiment.toJSON();
+      console.log("Building Docker image for computer environment...");
+      const buildRes = await buildComputerImage(
+        null, // No SSH key for now
+        experimentData.dockerfile_path ?? undefined,
+        experimentData.image_name ?? undefined,
+      );
+      if (buildRes.isErr()) {
+        return exitWithError(buildRes);
+      }
+      console.log("Docker image built successfully.");
+    }
+
+    // Copy paths to computers if specified
     if (options.path && isArrayOf(options.path, isString)) {
-      // Copy paths to all agents with computers
-      for (const agent of agents.filter((a) =>
-        a.toJSON().tools.includes("computer"),
-      )) {
-        for (const path of options.path) {
-          const res = await copyToComputer(computerId(experiment, agent), path);
+      if (!hasComputer) {
+        return exitWithError(
+          err(
+            "invalid_parameters_error",
+            "Cannot copy paths without computer tool enabled",
+          ),
+        );
+      }
+
+      for (const agentIndex of agentIndices) {
+        for (const pathStr of options.path) {
+          const res = await copyToComputer(
+            computerId(experiment, agentIndex),
+            pathStr,
+          );
           if (res.isErr()) {
             return exitWithError(res);
           }
@@ -381,22 +267,8 @@ agentCmd
       }
     }
 
-    let maxTokens: number | undefined;
+    // Parse max cost
     let maxCost: number | undefined;
-
-    if (options.maxTokens) {
-      maxTokens = parseInt(options.maxTokens);
-      if (isNaN(maxTokens) || maxTokens < 0) {
-        return exitWithError(
-          err(
-            "invalid_parameters_error",
-            "Max tokens must be a valid integer greater than 0",
-          ),
-        );
-      }
-      maxTokens *= 1_000_000; // convert to millions
-    }
-
     if (options.maxCost) {
       maxCost = parseFloat(options.maxCost);
       if (isNaN(maxCost) || maxCost < 0) {
@@ -409,10 +281,13 @@ agentCmd
       }
     }
 
+    // Build runners for all agents
     const builders = await Promise.all(
-      agents.map((a) =>
-        Runner.builder(experiment, a, {
+      agentIndices.map((agentIndex) =>
+        Runner.builder(experiment, agentIndex, systemPrompt, {
           reviewers,
+          tools: tools as any,
+          thinking: options.thinking,
         }),
       ),
     );
@@ -430,9 +305,8 @@ agentCmd
       }),
     );
 
-    // Run agents independently - each agent ticks without waiting for others
-    if (options.tick) {
-      // For single tick, run all concurrently and wait for completion
+    // Run single tick if specified
+    if (options.tick !== undefined) {
       const tickResults = await Promise.all(runners.map((r) => r.tick()));
       for (const tick of tickResults) {
         if (tick.isErr()) {
@@ -447,13 +321,11 @@ agentCmd
       tickCount: number,
       lastVal: number,
       maxVal: number,
-    ): boolean => (lastVal / maxVal) < 0.95
-        ? tickCount % 20 === 0
-        : true;
+    ): boolean => (lastVal / maxVal) < 0.95 ? tickCount % 20 === 0 : true;
 
     let tickCount = 0;
     let lastCost = await TokenUsageResource.experimentCost(experiment);
-    let lastTokens = (await TokenUsageResource.experimentTokenUsage(experiment)).total;
+
     // For continuous running, start each agent in its own independent loop
     const runnerPromises = runners.map(async (runner) => {
       while (true) {
@@ -461,15 +333,6 @@ agentCmd
           lastCost = await TokenUsageResource.experimentCost(experiment);
           if (lastCost > maxCost) {
             console.log(`Cost exceeded: ${lastCost.toFixed(2)}`);
-            process.exit(0);
-          }
-        }
-
-        // Check if max tokens is reached
-        if (maxTokens && shouldCheck(tickCount, lastTokens, maxTokens)) {
-          lastTokens = (await TokenUsageResource.experimentTokenUsage(experiment)).total;
-          if (lastTokens > maxTokens) {
-            console.log(`Tokens exceeded: ${lastTokens.toFixed(2)}`);
             process.exit(0);
           }
         }
@@ -483,7 +346,6 @@ agentCmd
       }
     });
 
-
     // Wait for any agent to fail, then exit
     try {
       await Promise.all(runnerPromises);
@@ -492,110 +354,139 @@ agentCmd
     }
   });
 
-agentCmd
-  .command("replay <name> <message>")
-  .description("Replay an agent message (warning: tools side effects)")
-  .requiredOption("-e, --experiment <experiment>", "Experiment name")
+// Publication commands
+const publicationCmd = program
+  .command("publication")
+  .description("Manage publications");
+
+publicationCmd
+  .command("list <experiment>")
+  .description("List publications for an experiment")
   .option(
-    "-r, --reviewers",
-    "Number of reviewers for each publication",
-    DEFAULT_REVIEWERS_COUNT.toString(),
+    "-s, --status <status>",
+    "Filter by status (PUBLISHED, SUBMITTED, REJECTED)",
+    "PUBLISHED",
   )
-  .action(async (name, message, options) => {
-    let reviewers = DEFAULT_REVIEWERS_COUNT;
-    if (options.reviewers) {
-      reviewers = parseInt(options.reviewers);
-      if (isNaN(reviewers) || reviewers < 0) {
-        return exitWithError(
-          err(
-            "invalid_parameters_error",
-            "Reviewers must be a valid integer greater than 0",
-          ),
-        );
-      }
-    }
-    const res = await experimentAndAgents({
-      experiment: options.experiment,
-      agent: name,
-    });
-    if (res.isErr()) {
-      return exitWithError(res);
-    }
-    const [experiment, [agent]] = res.value;
-
-    const buildRes = await Runner.builder(experiment, agent, {
-      reviewers,
-    });
-    if (buildRes.isErr()) {
-      return exitWithError(buildRes);
+  .option(
+    "-o, --order <order>",
+    "Order by (latest, citations)",
+    "latest",
+  )
+  .option("-l, --limit <limit>", "Maximum number to return", "10")
+  .option("--offset <offset>", "Offset for pagination", "0")
+  .action(async (experimentName, options) => {
+    const experimentRes = await ExperimentResource.findByName(experimentName);
+    if (experimentRes.isErr()) {
+      return exitWithError(experimentRes);
     }
 
-    const replay = await buildRes.value.replayAgentMessage(parseInt(message));
-    if (replay.isErr()) {
-      return exitWithError(replay);
+    const status = options.status.toUpperCase();
+    if (
+      status !== "PUBLISHED" &&
+      status !== "SUBMITTED" &&
+      status !== "REJECTED"
+    ) {
+      return exitWithError(
+        err(
+          "invalid_parameters_error",
+          "Status must be PUBLISHED, SUBMITTED, or REJECTED",
+        ),
+      );
+    }
+
+    const order = options.order;
+    if (order !== "latest" && order !== "citations") {
+      return exitWithError(
+        err(
+          "invalid_parameters_error",
+          "Order must be 'latest' or 'citations'",
+        ),
+      );
+    }
+
+    const limit = parseInt(options.limit);
+    const offset = parseInt(options.offset);
+
+    if (isNaN(limit) || limit < 1) {
+      return exitWithError(
+        err("invalid_parameters_error", "Limit must be a positive integer"),
+      );
+    }
+
+    if (isNaN(offset) || offset < 0) {
+      return exitWithError(
+        err(
+          "invalid_parameters_error",
+          "Offset must be a non-negative integer",
+        ),
+      );
+    }
+
+    const publications =
+      await PublicationResource.listPublishedByExperiment(
+        experimentRes.value,
+        {
+          order: order as any,
+          status: status as any,
+          limit,
+          offset,
+        },
+      );
+
+    if (publications.length === 0) {
+      console.log("No publications found.");
+      return;
+    }
+
+    for (const pub of publications) {
+      console.log(publicationHeader(pub));
+      console.log("");
     }
   });
 
-// Computer command
-const imageCmd = program.command("image").description("Docker image utils");
-
-imageCmd
-  .command("build")
-  .description("Build a computer Docker image")
-  .option("-p, --profile <profile>", "Profile to build image for")
-  .option(
-    "-i, --identity <private_key_path>",
-    "Path to SSH private key for Git access",
-  )
-  .action(async (options) => {
-    let profile: AgentProfile | undefined = undefined;
-    if (options.profile) {
-      const profileRes = await getAgentProfile(options.profile);
-      if (profileRes.isErr()) {
-        return exitWithError(profileRes);
-      }
-      profile = profileRes.value;
-      if (!profile.dockerFilePath) {
-        return exitWithError(
-          new Err(
-            new SrchdError(
-              "invalid_parameters_error",
-              `Profile '${options.profile}' does not have a Dockerfile.`,
-            ),
-          ),
-        );
-      }
-    }
-    const res = await buildComputerImage(
-      options.identity,
-      profile?.dockerFilePath,
-      profile?.imageName,
-    );
-    if (res.isErr()) {
-      return exitWithError(res);
+publicationCmd
+  .command("view <experiment> <reference>")
+  .description("View a specific publication")
+  .action(async (experimentName, reference) => {
+    const experimentRes = await ExperimentResource.findByName(experimentName);
+    if (experimentRes.isErr()) {
+      return exitWithError(experimentRes);
     }
 
-    console.log(
-      `computer Docker image ${profile?.imageName ?? ""} built successfully.`,
+    const publication = await PublicationResource.findByReference(
+      experimentRes.value,
+      reference,
     );
-  });
+    if (!publication) {
+      return exitWithError(
+        err("not_found_error", `Publication not found: ${reference}`),
+      );
+    }
 
-imageCmd
-  .command("show")
-  .description("Dump the computer Docker image")
-  .option(
-    "-i, --identity <private_key_path>",
-    "Path to SSH private key for Git access",
-  )
-  .action(async (options) => {
-    if (options.identity) {
-      const res = await dockerFileForIdentity(options.identity);
-      if (res.isErr()) {
-        return exitWithError(res);
+    const content = getPublicationContent(reference);
+    if (!content) {
+      return exitWithError(
+        err("not_found_error", "Publication content not found"),
+      );
+    }
+
+    console.log(publicationHeader(publication));
+    console.log("");
+    console.log(content);
+
+    const pubData = publication.toJSON();
+    if (pubData.status === "PUBLISHED") {
+      console.log("");
+      console.log("=".repeat(80));
+      console.log("REVIEWS:");
+      console.log("=".repeat(80));
+      for (const review of pubData.reviews) {
+        console.log("");
+        console.log(reviewHeader(review));
+        console.log("");
+        console.log(review.content);
+        console.log("-".repeat(80));
       }
-      console.log(res.value);
-    } else {
-      console.log(await dockerFile());
     }
   });
 

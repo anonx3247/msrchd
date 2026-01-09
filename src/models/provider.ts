@@ -34,6 +34,17 @@ export function isProvider(str: string): str is provider {
   ].includes(str);
 }
 
+export function isModel(model: string): model is Model {
+  return (
+    isAnthropicModel(model) ||
+    isOpenAIModel(model) ||
+    isGeminiModel(model) ||
+    isMistralModel(model) ||
+    isMoonshotAIModel(model) ||
+    isDeepseekModel(model)
+  );
+}
+
 export function providerFromModel(
   model:
     | OpenAIModel
