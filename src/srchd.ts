@@ -2,17 +2,13 @@
 
 import { Command } from "commander";
 import { readFileContent } from "./lib/fs";
-import { Err, err, ok, Result, SrchdError } from "./lib/error";
+import { Err, err, SrchdError } from "./lib/error";
 import { ExperimentResource } from "./resources/experiment";
 import { Runner } from "./runner";
 import { isArrayOf, isString, removeNulls } from "./lib/utils";
 import { isThinkingConfig } from "./models";
-import {
-  buildComputerImage,
-  dockerFile,
-  dockerFileForIdentity,
-} from "./computer/image";
-import { Computer, computerId } from "./computer";
+import { buildComputerImage } from "./computer/image";
+import { computerId } from "./computer";
 import { copyToComputer } from "./computer/k8s";
 import { TokenUsageResource } from "./resources/token_usage";
 import { PublicationResource } from "./resources/publication";
@@ -35,7 +31,6 @@ const exitWithError = (err: Err<SrchdError>) => {
   process.exit(1);
 };
 
-const DEFAULT_REVIEWERS_COUNT = 4;
 const DEFAULT_AGENT_COUNT = 0;
 const DEFAULT_MODEL: Model = "claude-sonnet-4-5";
 const DEFAULT_THINKING = "low";
@@ -426,8 +421,8 @@ publicationCmd
       await PublicationResource.listPublishedByExperiment(
         experimentRes.value,
         {
-          order: order as any,
-          status: status as any,
+          order: order as "latest" | "citations",
+          status: status as "PUBLISHED" | "SUBMITTED" | "REJECTED",
           limit,
           offset,
         },
