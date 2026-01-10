@@ -8,8 +8,7 @@ import { Runner } from "./runner";
 import { isArrayOf, isString, removeNulls } from "./lib/utils";
 import { isThinkingConfig } from "./models";
 import { buildComputerImage } from "./computer/image";
-import { computerId } from "./computer";
-import { copyToComputer } from "./computer/k8s";
+import { computerId, Computer } from "./computer";
 import { TokenUsageResource } from "./resources/token_usage";
 import { PublicationResource } from "./resources/publication";
 import {
@@ -240,7 +239,7 @@ program
 
       for (const agentIndex of agentIndices) {
         for (const pathStr of options.path) {
-          const res = await copyToComputer(
+          const res = await Computer.copyToComputer(
             computerId(experiment, agentIndex),
             pathStr,
           );
