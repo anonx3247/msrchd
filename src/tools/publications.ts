@@ -6,8 +6,7 @@ import { ExperimentResource } from "@app/resources/experiment";
 import { err } from "@app/lib/error";
 import { PUBLICATIONS_SERVER_NAME as SERVER_NAME } from "@app/tools/constants";
 import { RunConfig } from "@app/runner/config";
-import { copyFromComputer, copyToComputer } from "@app/computer/k8s";
-import { computerId } from "@app/computer";
+import { computerId, Computer } from "@app/computer";
 import { newID6 } from "@app/lib/utils";
 import fs from "fs";
 import path from "path";
@@ -329,7 +328,7 @@ ${r.content}`;
 
         for (const attachmentPath of attachments) {
           const localFilePath = getAttachmentPath(experiment.toJSON().id, reference, attachmentPath);
-          const copyRes = await copyFromComputer(
+          const copyRes = await Computer.copyFromComputer(
             computerId(experiment, agentIndex),
             attachmentPath,
             localFilePath,
@@ -390,10 +389,9 @@ ${r.content}`;
           );
         }
 
-        const copyRes = await copyToComputer(
+        const copyRes = await Computer.copyToComputer(
           computerId(experiment, agentIndex),
           attachmentsDir,
-          undefined,
           "publications",
         );
 
