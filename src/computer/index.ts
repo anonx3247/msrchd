@@ -8,8 +8,7 @@ import {
 import { ExperimentResource } from "@app/resources/experiment";
 import { podName } from "@app/lib/k8s";
 import { computerExec, ensureComputerPod } from "./k8s";
-import { DEFAULT_WORKDIR } from "./definitions";
-import { Env } from "@app/agent_profile";
+import { DEFAULT_WORKDIR, Env } from "./definitions";
 
 export function computerId(
   experiment: ExperimentResource,
