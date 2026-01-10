@@ -21,7 +21,6 @@
     "@anthropic-ai/sdk": "^0.57.0",
     "@google/genai": "^1.13.0",
     "@huggingface/transformers": "^3.8.0",
-    "@kubernetes/client-node": "^1.4.0",
     "@mendable/firecrawl": "^1.21.1",
     "@mistralai/mistralai": "^1.10.0",
     "@modelcontextprotocol/sdk": "^1.17.1",
