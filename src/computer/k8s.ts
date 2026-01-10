@@ -1,7 +1,7 @@
 import { K8S_NAMESPACE, kc, podName, timeout } from "@app/lib/k8s";
 import { ensure, k8sApi } from "@app/lib/k8s";
 import { err, Err, ok, Result } from "@app/lib/error";
-import { defineComputerPod } from "./definitions";
+import { defineComputerPod, Env } from "./definitions";
 import { Readable, Writable } from "stream";
 import * as k8s from "@kubernetes/client-node";
 import fs from "fs";
@@ -9,7 +9,6 @@ import tar from "tar-stream";
 import p from "path";
 import { readFile } from "fs/promises";
 import { addDirectoryToTar } from "@app/lib/image";
-import { Env } from "@app/agent_profile";
 
 export async function ensureComputerPod(
   namespace: string,

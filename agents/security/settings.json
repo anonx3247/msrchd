@@ -1,6 +1,0 @@
-{
-  "description": "Research agent focused on security",
-  "tools": ["web", "computer"],
-  "env": [],
-  "imageName": "agent-computer:security"
-}

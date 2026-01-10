@@ -1,7 +1,9 @@
 import * as k8s from "@kubernetes/client-node";
 import { podName } from "@app/lib/k8s";
-import { Env } from "@app/agent_profile";
 import { isString } from "@app/lib/utils";
+
+// Either the name of a local ENV var to capture, or a name and value pair.
+export type Env = string | [string, string];
 
 export const COMPUTER_IMAGE = "agent-computer:base";
 export const DEFAULT_WORKDIR = "/home/agent";
