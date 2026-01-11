@@ -1,8 +1,7 @@
 import { db } from "@app/db";
-import { experiments } from "@app/db/schema";
+import { experiments, messages } from "@app/db/schema";
 import { err, ok, Result } from "@app/lib/error";
-import { eq, InferSelectModel, InferInsertModel } from "drizzle-orm";
-import { createLLM } from "@app/models/provider";
+import { eq, InferSelectModel, InferInsertModel, sum } from "drizzle-orm";
 
 type Experiment = InferSelectModel<typeof experiments>;
 
@@ -75,29 +74,21 @@ export class ExperimentResource {
     return Array.from({ length: this.data.agent_count }, (_, i) => i);
   }
 
-  async addTokens(amount: number): Promise<void> {
-    const [updated] = await db
-      .update(experiments)
-      .set({
-        tokens: this.data.tokens + amount,
-        updated: new Date(),
-      })
-      .where(eq(experiments.id, this.data.id))
-      .returning();
+  async getTotalTokens(): Promise<number> {
+    const results = await db
+      .select({ total: sum(messages.total_tokens) })
+      .from(messages)
+      .where(eq(messages.experiment, this.data.id));
 
-    this.data = updated;
+    return Number(results[0]?.total ?? 0);
   }
 
   async getTotalCost(): Promise<number> {
-    const llm = createLLM(this.data.model);
-    return llm.cost([
-      {
-        total: this.data.tokens,
-        input: 0,
-        output: 0,
-        cached: 0,
-        thinking: 0,
-      },
-    ]);
+    const results = await db
+      .select({ total: sum(messages.cost) })
+      .from(messages)
+      .where(eq(messages.experiment, this.data.id));
+
+    return Number(results[0]?.total ?? 0);
   }
 }

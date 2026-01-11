@@ -9,7 +9,6 @@ import { isArrayOf, isString, removeNulls } from "./lib/utils";
 import { isThinkingConfig } from "./models";
 import { buildComputerImage } from "./computer/image";
 import { computerId, Computer } from "./computer";
-import { TokenUsageResource } from "./resources/token_usage";
 import { PublicationResource } from "./resources/publication";
 import {
   getPublicationContent,
@@ -307,13 +306,13 @@ program
     ): boolean => (lastVal / maxVal) < 0.95 ? tickCount % 20 === 0 : true;
 
     let tickCount = 0;
-    let lastCost = await TokenUsageResource.experimentCost(experiment);
+    let lastCost = await experiment.getTotalCost();
 
     // For continuous running, start each agent in its own independent loop
     const runnerPromises = runners.map(async (runner) => {
       while (true) {
         if (maxCost && shouldCheck(tickCount, lastCost, maxCost)) {
-          lastCost = await TokenUsageResource.experimentCost(experiment);
+          lastCost = await experiment.getTotalCost();
           if (lastCost > maxCost) {
             console.log(`Cost exceeded: ${lastCost.toFixed(2)}`);
             process.exit(0);

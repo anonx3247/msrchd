@@ -71,6 +71,8 @@ export class MessageResource {
     agentIndex: number,
     message: Message,
     positon: number,
+    totalTokens: number,
+    cost: number,
     options?: { tx?: Tx },
   ): Promise<MessageResource> {
     const executor = options?.tx ?? db;
@@ -81,6 +83,8 @@ export class MessageResource {
         agent: agentIndex,
         ...message,
         position: positon,
+        total_tokens: totalTokens,
+        cost,
       })
       .returning();
 
