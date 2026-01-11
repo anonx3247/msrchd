@@ -1,7 +1,7 @@
 import { db } from "@app/db";
-import { experiments, messages } from "@app/db/schema";
+import { experiments } from "@app/db/schema";
 import { err, ok, Result } from "@app/lib/error";
-import { eq, InferSelectModel, InferInsertModel, sum } from "drizzle-orm";
+import { eq, InferSelectModel, InferInsertModel } from "drizzle-orm";
 
 type Experiment = InferSelectModel<typeof experiments>;
 
@@ -72,23 +72,5 @@ export class ExperimentResource {
 
   getAgentIndices(): number[] {
     return Array.from({ length: this.data.agent_count }, (_, i) => i);
-  }
-
-  async getTotalTokens(): Promise<number> {
-    const results = await db
-      .select({ total: sum(messages.total_tokens) })
-      .from(messages)
-      .where(eq(messages.experiment, this.data.id));
-
-    return Number(results[0]?.total ?? 0);
-  }
-
-  async getTotalCost(): Promise<number> {
-    const results = await db
-      .select({ total: sum(messages.cost) })
-      .from(messages)
-      .where(eq(messages.experiment, this.data.id));
-
-    return Number(results[0]?.total ?? 0);
   }
 }

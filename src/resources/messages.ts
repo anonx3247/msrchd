@@ -1,6 +1,6 @@
 import { db, Tx } from "@app/db";
 import { messages } from "@app/db/schema";
-import { eq, InferSelectModel, and, asc } from "drizzle-orm";
+import { eq, InferSelectModel, and, asc, sum } from "drizzle-orm";
 import { ExperimentResource } from "./experiment";
 import { Message } from "@app/models";
 
@@ -109,5 +109,27 @@ export class MessageResource {
       role: this.data.role,
       content: this.data.content,
     };
+  }
+
+  static async totalTokensForExperiment(
+    experiment: ExperimentResource,
+  ): Promise<number> {
+    const results = await db
+      .select({ total: sum(messages.total_tokens) })
+      .from(messages)
+      .where(eq(messages.experiment, experiment.toJSON().id));
+
+    return Number(results[0]?.total ?? 0);
+  }
+
+  static async totalCostForExperiment(
+    experiment: ExperimentResource,
+  ): Promise<number> {
+    const results = await db
+      .select({ total: sum(messages.cost) })
+      .from(messages)
+      .where(eq(messages.experiment, experiment.toJSON().id));
+
+    return Number(results[0]?.total ?? 0);
   }
 }

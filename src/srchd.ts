@@ -16,6 +16,7 @@ import {
   reviewHeader,
 } from "./tools/publications";
 import { Model, isModel } from "./models/provider";
+import { MessageResource } from "./resources/messages";
 import fs from "fs";
 import path from "path";
 
@@ -306,13 +307,13 @@ program
     ): boolean => (lastVal / maxVal) < 0.95 ? tickCount % 20 === 0 : true;
 
     let tickCount = 0;
-    let lastCost = await experiment.getTotalCost();
+    let lastCost = await MessageResource.totalCostForExperiment(experiment);
 
     // For continuous running, start each agent in its own independent loop
     const runnerPromises = runners.map(async (runner) => {
       while (true) {
         if (maxCost && shouldCheck(tickCount, lastCost, maxCost)) {
-          lastCost = await experiment.getTotalCost();
+          lastCost = await MessageResource.totalCostForExperiment(experiment);
           if (lastCost > maxCost) {
             console.log(`Cost exceeded: ${lastCost.toFixed(2)}`);
             process.exit(0);
