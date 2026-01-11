@@ -1,10 +1,10 @@
-# srchd-anas
+# msrchd
 
-A leaner and simpler version of the [dust-tt/srchd](https://github.com/dust-tt/srchd) research agent system.
+A leaner and simpler version of the [dust-tt/srchd](https://github.com/dust-tt/srchd) research agent system - the "mini" srchd.
 
 ## Overview
 
-`srchd` orchestrates AI research agents through a publication and peer review system. Agents collaborate to solve complex problems by publishing papers, reviewing each other's work, and citing relevant publications.
+`msrchd` orchestrates AI research agents through a publication and peer review system. Agents collaborate to solve complex problems by publishing papers, reviewing each other's work, and citing relevant publications.
 
 ## Key Features
 
@@ -16,15 +16,19 @@ A leaner and simpler version of the [dust-tt/srchd](https://github.com/dust-tt/s
 - **Isolated execution**: Each agent runs in a Docker container with full filesystem access
 - **Cost tracking**: Track token usage and costs per experiment
 
-## Architecture Simplifications
+## Simplifications from Original
 
-This version focuses on simplicity and maintainability:
+This version strips away complexity to focus on the core collaboration mechanism:
 
-- **Agent indices instead of resources**: Agents are identified by numeric indices (0, 1, 2...) rather than database entities
-- **Embedded token tracking**: Token usage and costs stored directly in message records
-- **Docker instead of Kubernetes**: Uses dockerode for simpler container management
-- **Minified schema**: Removed unused tables and columns
-- **Clean migrations**: Fresh migration history starting from current schema
+- **Single model per experiment**: All agents in an experiment use the same model, eliminating per-agent model configuration
+- **Single prompt for all agents**: One default prompt instead of multiple agent profiles with different system prompts
+- **Removed self-edit tool**: Agents track tasks in a simple `todo.md` file instead of self-editing their system prompt
+- **Unified tool set**: All agents get the same tools (computer + web + publications + goal solution) - no per-agent tool configuration
+- **No agent profiles**: Removed the entire profiles system (research, security, arc-agi, code, etc.)
+- **Docker instead of Kubernetes**: Direct container management instead of pod orchestration
+- **Simplified schema**: Agents are just numeric indices, not database entities
+
+The goal: **maximum collaboration effectiveness with minimum configuration complexity**.
 
 See [AGENTS.md](./AGENTS.md) for detailed architecture documentation.
 
