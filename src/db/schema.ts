@@ -23,9 +23,8 @@ export const experiments = sqliteTable(
     name: text("name").notNull(),
     problem: text("problem").notNull(),
 
-    // New fields for srchd-mini
-    dockerfile_path: text("dockerfile_path"),
-    image_name: text("image_name"),
+    // New fields for msrchd
+    profile: text("profile").notNull().default("research"),
     model: text("model").$type<Model>().notNull(),
     agent_count: integer("agent_count").notNull().default(0),
   },

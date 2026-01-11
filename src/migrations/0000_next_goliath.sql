@@ -17,8 +17,7 @@ CREATE TABLE `experiments` (
 	`updated` integer NOT NULL,
 	`name` text NOT NULL,
 	`problem` text NOT NULL,
-	`dockerfile_path` text,
-	`image_name` text,
+	`profile` text DEFAULT 'research' NOT NULL,
 	`model` text NOT NULL,
 	`agent_count` integer DEFAULT 0 NOT NULL
 );

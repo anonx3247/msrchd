@@ -6,18 +6,17 @@ import { buildImage } from "@app/lib/image";
 
 const IDENTITY_FILES_COPY_PLACEHOLDER = "# IDENTITY_FILES_COPY_PLACEHOLDER";
 
-export const COMPUTER_DEFAULT_DOCKERFILE_PATH = path.join(
-  __dirname,
-  "Dockerfile",
-);
+export function getDockerfilePathForProfile(profile: string): string {
+  return path.join(__dirname, "../../profiles", profile, "Dockerfile");
+}
 
-export async function dockerFile(path?: string): Promise<string> {
-  return await readFile(path ?? COMPUTER_DEFAULT_DOCKERFILE_PATH, "utf8");
+export async function dockerFile(dockerfilePath: string): Promise<string> {
+  return await readFile(dockerfilePath, "utf8");
 }
 
 export async function dockerFileForIdentity(
   privateKeyPath: string,
-  dfPath?: string,
+  dfPath: string,
 ): Promise<Result<string>> {
   const publicKeyPath = privateKeyPath + ".pub";
   // check that both files exist
@@ -87,19 +86,21 @@ async function identityFilePacker(
 
 export async function buildComputerImage(
   privateKeyPath: string | null,
-  path?: string,
-  imageName?: string,
+  profile: string,
 ): Promise<Result<void>> {
+  const dockerfilePath = getDockerfilePathForProfile(profile);
   const df = privateKeyPath
-    ? await dockerFileForIdentity(privateKeyPath, path)
-    : ok(await dockerFile(path));
+    ? await dockerFileForIdentity(privateKeyPath, dockerfilePath)
+    : ok(await dockerFile(dockerfilePath));
 
   if (df.isErr()) {
     return df;
   }
 
+  const imageName = `agent-computer:${profile}`;
+
   return buildImage(
-    imageName ?? "agent-computer:base",
+    imageName,
     df.value,
     privateKeyPath
       ? (pack) => identityFilePacker(pack, privateKeyPath)

@@ -17,8 +17,6 @@ import {
 } from "./tools/publications";
 import { Model, isModel } from "./models/provider";
 import { MessageResource } from "./resources/messages";
-import fs from "fs";
-import path from "path";
 
 const exitWithError = (err: Err<SrchdError>) => {
   console.error(
@@ -64,8 +62,9 @@ experimentCmd
     DEFAULT_AGENT_COUNT.toString(),
   )
   .option(
-    "-d, --dockerfile <path>",
-    "Optional path to Dockerfile for agent computer environment",
+    "--profile <profile>",
+    "Profile to use (research, formal-math, security)",
+    "research",
   )
   .action(async (name, options) => {
     console.log(`Creating experiment: ${name}`);
@@ -94,15 +93,15 @@ experimentCmd
       );
     }
 
-    // Validate dockerfile if provided
-    let dockerfilePath: string | undefined;
-    if (options.dockerfile) {
-      if (!fs.existsSync(options.dockerfile)) {
-        return exitWithError(
-          err("not_found_error", `Dockerfile not found: ${options.dockerfile}`),
-        );
-      }
-      dockerfilePath = path.resolve(options.dockerfile);
+    // Validate profile
+    const validProfiles = ["research", "formal-math", "security"];
+    if (!validProfiles.includes(options.profile)) {
+      return exitWithError(
+        err(
+          "invalid_parameters_error",
+          `Invalid profile: ${options.profile}. Must be one of: ${validProfiles.join(", ")}`,
+        ),
+      );
     }
 
     const experiment = await ExperimentResource.create({
@@ -110,7 +109,7 @@ experimentCmd
       problem: problem.value,
       model: options.model,
       agent_count: agentCount,
-      dockerfile_path: dockerfilePath,
+      profile: options.profile,
     });
 
     const e = experiment.toJSON();
@@ -214,11 +213,10 @@ program
     const hasComputer = tools.includes("computer");
     if (hasComputer) {
       const experimentData = experiment.toJSON();
-      console.log("Building Docker image for computer environment...");
+      console.log(`Building Docker image for ${experimentData.profile} profile...`);
       const buildRes = await buildComputerImage(
         null, // No SSH key for now
-        experimentData.dockerfile_path ?? undefined,
-        experimentData.image_name ?? undefined,
+        experimentData.profile,
       );
       if (buildRes.isErr()) {
         return exitWithError(buildRes);

@@ -25,10 +25,10 @@ import { createLLM } from "@app/models/provider";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-const DEFAULT_PROMPT = readFileSync(
-  join(__dirname, "../default_prompt.md"),
-  "utf-8",
-);
+function loadPromptForProfile(profile: string): string {
+  const promptPath = join(__dirname, "../../profiles", profile, "prompt.md");
+  return readFileSync(promptPath, "utf-8");
+}
 
 export class Runner {
   private experiment: ExperimentResource;
@@ -471,7 +471,8 @@ This is an automated system message and there is no user available to respond. P
       this.messages.push(newMessage.value);
     }
 
-    const systemPrompt = DEFAULT_PROMPT.replace(
+    const profile = this.experiment.toJSON().profile;
+    const systemPrompt = loadPromptForProfile(profile).replace(
       "{{PROBLEM}}",
       this.experiment.toJSON().problem,
     );
