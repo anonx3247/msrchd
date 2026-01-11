@@ -221,7 +221,6 @@ export class DeepseekLLM extends LLM {
         tokenUsage,
       });
     } catch (error) {
-      console.log(error);
       return err("model_error", "Failed to run model", error);
     }
   }

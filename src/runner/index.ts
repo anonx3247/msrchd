@@ -16,6 +16,7 @@ import assert from "assert";
 import { PublicationResource } from "@app/resources/publication";
 import { renderListOfPublications } from "@app/tools/publications";
 import { createClientServerPair, errorToCallToolResult } from "@app/lib/mcp";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { concurrentExecutor } from "@app/lib/async";
 import { assertNever } from "@app/lib/assert";
 import { createServer } from "@app/tools";
@@ -139,12 +140,6 @@ export class Runner {
       }
     }
 
-    // console.log("--------------------------------");
-    // console.log("Available Tools:");
-    // tools.forEach((tool) => {
-    //   console.log(`- ${tool.name}: ${tool.description}`);
-    // });
-
     return ok(tools);
   }
 
@@ -159,18 +154,14 @@ export class Runner {
               arguments: t.input,
             });
 
-            // console.log(result);
-            // console.log(JSON.stringify(result, null, 2));
-
-            return {
+            const toolResult: ToolResult = {
               type: "tool_result",
               toolUseId: t.id,
               toolUseName: t.name,
-              // @ts-ignore TODO(spolu): investigate mismatch
-              content: result.content,
-              // @ts-ignore TODO(spolu): investigate mismatch
-              isError: result.isError ?? false,
+              content: result.content as CallToolResult["content"],
+              isError: (result.isError ?? false) as boolean,
             };
+            return toolResult;
           }
         }
       } catch (error) {
