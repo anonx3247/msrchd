@@ -28,7 +28,6 @@ export const experiments = sqliteTable(
     image_name: text("image_name"),
     model: text("model").$type<Model>().notNull(),
     agent_count: integer("agent_count").notNull().default(0),
-    tokens: integer("tokens").notNull().default(0),
   },
   (t) => [unique().on(t.name)],
 );
