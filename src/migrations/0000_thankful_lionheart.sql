@@ -20,8 +20,7 @@ CREATE TABLE `experiments` (
 	`dockerfile_path` text,
 	`image_name` text,
 	`model` text NOT NULL,
-	`agent_count` integer DEFAULT 0 NOT NULL,
-	`tokens` integer DEFAULT 0 NOT NULL
+	`agent_count` integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `experiments_name_unique` ON `experiments` (`name`);--> statement-breakpoint
