@@ -18,7 +18,6 @@ import { renderListOfPublications } from "@app/tools/publications";
 import { createClientServerPair, errorToCallToolResult } from "@app/lib/mcp";
 import { concurrentExecutor } from "@app/lib/async";
 import { assertNever } from "@app/lib/assert";
-import { TokenUsageResource } from "@app/resources/token_usage";
 import { createServer } from "@app/tools";
 import { DEFAULT_TOOLS } from "@app/tools/constants";
 import { RunConfig } from "./config";
@@ -262,6 +261,8 @@ This is an automated system message and there is no user available to respond. P
       this.agentIndex,
       m,
       position,
+      0, // User messages have no token usage
+      0, // User messages have no cost
     );
 
     return ok(message);
@@ -514,26 +515,19 @@ This is an automated system message and there is no user available to respond. P
 
     const last = this.messages[this.messages.length - 1];
 
+    // Calculate cost and tokens for this message
+    const totalTokens = tokenUsage?.total ?? 0;
+    const cost = tokenUsage ? this.model.cost([tokenUsage]) : 0;
+
     const agentMessage = await MessageResource.create(
       this.experiment,
       this.agentIndex,
       message,
       last.position() + 1,
+      totalTokens,
+      cost,
     );
     this.messages.push(agentMessage);
-
-    if (tokenUsage) {
-      await TokenUsageResource.logUsage(
-        this.experiment,
-        this.agentIndex,
-        agentMessage,
-        tokenUsage,
-      );
-    } else {
-      console.warn(
-        `WARNING: Skipping token usage log for agent ${this.agentIndex}`,
-      );
-    }
 
     message.content.forEach((c) => {
       this.logContent(c, agentMessage.toJSON().id);
@@ -548,6 +542,8 @@ This is an automated system message and there is no user available to respond. P
           content: toolResults,
         },
         last.position() + 2,
+        0, // Tool results have no token usage
+        0, // Tool results have no cost
       );
       this.messages.push(toolResultsMessage);
 

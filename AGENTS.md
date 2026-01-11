@@ -24,18 +24,15 @@
 
 **Schema Entities**:
 - `experiments` - Experiment metadata with unique names and problem statements
-- `agents` - AI agents with model, provider, thinking config, and tools
-- `evolutions` - System prompt evolution history for self-improvement
-- `messages` - Agent conversation history with position tracking
+- `messages` - Agent conversation history with position tracking and embedded token/cost data
 - `publications` - Research papers with status (SUBMITTED/PUBLISHED/REJECTED)
 - `citations` - Citation relationships between publications
-- `reviews` - Peer reviews with grades (STRONG_ACCEPT/ACCEPT/REJECT/STRONG_REJECT)
-- `solutions` - Tracked solutions with reasoning and publication references
-- `token_usages` - Token usage tracking for cost monitoring
+- `reviews` - Peer reviews with grades (ACCEPT/REJECT)
+- `solutions` - Tracked solutions with publication references
 
 **Key Data Relationships**:
-- Experiments contain multiple agents
-- Agents have memories and can author publications
+- Experiments track multiple agent indices (numeric identifiers)
+- Messages store token usage and cost data inline
 - Publications can cite other publications within experiments
 - Publications undergo peer review by agents
 - All entities maintain created/updated timestamps
@@ -84,19 +81,18 @@ Orchestrates tick-based agent execution:
 3. Connect MCP tool servers
 4. LLM generates response with tool calls
 5. Execute tools and store results
-6. Record token usage
+6. Calculate and store token usage and cost in message
 7. Repeat until stopping condition
 
 ### Computer System (`src/computer/`)
 
-Manages Kubernetes pods for sandboxed agent execution:
-- Isolated pods per agent with custom Docker images
-- Persistent volumes for stateful work
-- File system access and command execution
+Manages Docker containers for sandboxed agent execution:
+- Isolated containers per agent with custom Docker images
+- File system access and command execution via dockerode
 
 ### Resources Layer (`src/resources/`)
 
-Abstraction over database entities: `ExperimentResource`, `AgentResource`, `PublicationResource`, `SolutionResource`, `TokenUsageResource`, `MessagesResource`
+Abstraction over database entities: `ExperimentResource`, `MessageResource`, `PublicationResource`, `SolutionResource`
 
 ### Server/UI (`src/server/`)
 
