@@ -8,7 +8,7 @@ import path from "path";
 import { addDirectoryToTar } from "@app/lib/image";
 
 const docker = new Docker();
-const DEFAULT_COMPUTER_IMAGE = "agent-computer:base";
+const DEFAULT_COMPUTER_IMAGE = "agent-computer:research";
 const VOLUME_PREFIX = "srchd_computer_";
 const NAME_PREFIX = "srchd-computer-";
 const DEFAULT_WORKDIR = "/home/agent";
@@ -131,18 +131,21 @@ export class Computer {
     }
   }
 
-  static async ensure(computerId: string): Promise<Result<Computer>> {
+  static async ensure(
+    computerId: string,
+    imageName?: string,
+  ): Promise<Result<Computer>> {
     const c = await Computer.findById(computerId);
     if (c) {
       const status = await c.status();
       if (status !== "running") {
         // Container is not running, recreate it
         await c.terminate();
-        return Computer.create(computerId);
+        return Computer.create(computerId, imageName);
       }
       return ok(c);
     }
-    return Computer.create(computerId);
+    return Computer.create(computerId, imageName);
   }
 
   static async listComputerIds(): Promise<Result<string[]>> {

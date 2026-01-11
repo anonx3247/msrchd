@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6731bc56-a47c-419a-bd2d-dc6ed4fe2ce1",
+  "id": "62839b90-259e-47b3-8f30-a34d0a883fa3",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "citations": {
@@ -144,19 +144,13 @@
           "notNull": true,
           "autoincrement": false
         },
-        "dockerfile_path": {
-          "name": "dockerfile_path",
+        "profile": {
+          "name": "profile",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "image_name": {
-          "name": "image_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'research'"
         },
         "model": {
           "name": "model",
