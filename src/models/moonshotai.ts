@@ -197,8 +197,6 @@ export class MoonshotAILLM extends LLM {
         );
       }
 
-      // console.log(response.usage);
-
       const tokenUsage = response.usage
         ? this.tokenUsage(response.usage)
         : undefined;
@@ -211,7 +209,6 @@ export class MoonshotAILLM extends LLM {
         tokenUsage,
       });
     } catch (error) {
-      console.log(error);
       return err("model_error", "Failed to run model", error);
     }
   }
