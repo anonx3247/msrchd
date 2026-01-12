@@ -39,7 +39,7 @@ export async function buildImage(
   }
 
   pack.finalize();
-  const stream = await docker.buildImage(pack, { t: imageName });
+  const stream = await docker.buildImage(pack, { t: imageName, nocache: true });
 
   return new Promise((resolve) => {
     docker.modem.followProgress(
