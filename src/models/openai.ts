@@ -58,19 +58,12 @@ export function convertToolChoice(toolChoice: ToolChoice) {
   }
 }
 
-export function convertThinking(thinking: "high" | "low" | "none" | undefined) {
-  switch (thinking) {
-    case "high":
-      return "medium";
-    case "low":
-      return "low";
-    case "none":
-      return "minimal";
-    case undefined:
-      return "low";
-    default:
-      assertNever(thinking);
+export function convertThinking(thinking: boolean | undefined) {
+  // true = enabled (use medium), false = disabled (use minimal), undefined = default (use medium)
+  if (thinking === false) {
+    return "minimal";
   }
+  return "medium";
 }
 
 export type OpenAIModel =
