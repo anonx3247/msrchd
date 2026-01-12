@@ -194,6 +194,18 @@ program
     }
     console.log("Docker image built successfully.");
 
+    // Ensure computers are created before copying files
+    const imageName = `agent-computer:${experimentData.profile}`;
+    for (const agentIndex of agentIndices) {
+      const computerRes = await Computer.ensure(
+        computerId(experiment, agentIndex),
+        imageName,
+      );
+      if (computerRes.isErr()) {
+        return exitWithError(computerRes);
+      }
+    }
+
     // Copy paths to computers if specified
     if (options.path && isArrayOf(options.path, isString)) {
       for (const agentIndex of agentIndices) {
