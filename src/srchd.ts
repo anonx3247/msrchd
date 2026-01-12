@@ -6,6 +6,7 @@ import { Err, err, SrchdError } from "./lib/error";
 import { ExperimentResource } from "./resources/experiment";
 import { Runner } from "./runner";
 import { isArrayOf, isString, removeNulls } from "./lib/utils";
+import { isThinkingConfig } from "./models";
 import { buildComputerImage } from "./computer/image";
 import { computerId, Computer } from "./computer";
 import { PublicationResource } from "./resources/publication";
@@ -29,6 +30,7 @@ const exitWithError = (err: Err<SrchdError>) => {
 
 const DEFAULT_AGENT_COUNT = 0;
 const DEFAULT_MODEL: Model = "claude-sonnet-4-5";
+const DEFAULT_THINKING = "low";
 
 const program = new Command();
 
@@ -147,7 +149,11 @@ program
     "Run one tick for a specific agent (by index)",
   )
   .option("--max-cost <cost>", "Max cost (in dollars) before stopping run")
-  .option("--no-thinking", "Disable extended thinking (enabled by default)")
+  .option(
+    "--thinking <thinking>",
+    "Thinking configuration (none | low | high)",
+    DEFAULT_THINKING,
+  )
   .option("--no-computer", "Disable computer tool (enabled by default)")
   .option("--no-web", "Disable web tool (enabled by default)")
   .action(async (experimentName, options) => {
@@ -161,6 +167,16 @@ program
 
     // Calculate reviewers: 4 unless we have less than 5 agents
     const reviewers = agentCount >= 5 ? 4 : agentCount - 1;
+
+    // Parse thinking
+    if (!isThinkingConfig(options.thinking)) {
+      return exitWithError(
+        err(
+          "invalid_parameters_error",
+          `Invalid thinking config: ${options.thinking}`,
+        ),
+      );
+    }
 
     // Determine tools: computer and web are enabled by default
     const tools: string[] = [];

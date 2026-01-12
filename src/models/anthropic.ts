@@ -15,7 +15,8 @@ import { BetaUsage } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 
 const DEFAULT_TIMEOUT = 600000 * 2; // 20 minutes (double the default)
 const DEFAULT_MAX_TOKENS = 8192;
-const DEFAULT_THINKING_TOKENS = 8192;
+const DEFAULT_LOW_THINKING_TOKENS = 4096;
+const DEFAULT_HIGH_THINKING_TOKENS = 16384;
 
 type AnthropicTokenPrices = {
   baseInput: number;
@@ -193,12 +194,19 @@ export class AnthropicLLM extends LLM {
         max_tokens:
           this.config.maxTokens ??
           (() => {
-            // thinking: true = enabled, false/undefined = disabled
-            if (this.config.thinking === false) {
-              return DEFAULT_MAX_TOKENS;
+            switch (this.config.thinking) {
+              case undefined:
+              case "none":
+                return DEFAULT_MAX_TOKENS;
+              case "low": {
+                return DEFAULT_LOW_THINKING_TOKENS + DEFAULT_MAX_TOKENS;
+              }
+              case "high": {
+                return DEFAULT_HIGH_THINKING_TOKENS + DEFAULT_MAX_TOKENS;
+              }
+              default:
+                assertNever(this.config.thinking);
             }
-            // Default or explicitly enabled: use thinking tokens
-            return DEFAULT_THINKING_TOKENS + DEFAULT_MAX_TOKENS;
           })(),
         messages: this.messages(messages),
         system: [
@@ -211,15 +219,24 @@ export class AnthropicLLM extends LLM {
           },
         ],
         thinking: (() => {
-          // thinking: true = enabled, false/undefined = disabled
-          if (this.config.thinking === false) {
-            return { type: "disabled" };
+          switch (this.config.thinking) {
+            case undefined:
+              return {
+                type: "disabled",
+              };
+            case "low": {
+              return {
+                type: "enabled",
+                budget_tokens: DEFAULT_LOW_THINKING_TOKENS,
+              };
+            }
+            case "high": {
+              return {
+                type: "enabled",
+                budget_tokens: DEFAULT_HIGH_THINKING_TOKENS,
+              };
+            }
           }
-          // Default or explicitly enabled
-          return {
-            type: "enabled",
-            budget_tokens: DEFAULT_THINKING_TOKENS,
-          };
         })(),
         tools: tools.map((tool) => ({
           name: tool.name,
@@ -312,15 +329,24 @@ export class AnthropicLLM extends LLM {
         messages: this.messages(messages),
         system: prompt,
         thinking: (() => {
-          // thinking: true = enabled, false/undefined = disabled
-          if (this.config.thinking === false) {
-            return { type: "disabled" };
+          switch (this.config.thinking) {
+            case undefined:
+              return {
+                type: "disabled",
+              };
+            case "low": {
+              return {
+                type: "enabled",
+                budget_tokens: DEFAULT_LOW_THINKING_TOKENS,
+              };
+            }
+            case "high": {
+              return {
+                type: "enabled",
+                budget_tokens: DEFAULT_HIGH_THINKING_TOKENS,
+              };
+            }
           }
-          // Default or explicitly enabled
-          return {
-            type: "enabled",
-            budget_tokens: DEFAULT_THINKING_TOKENS,
-          };
         })(),
         tools: tools.map((tool) => ({
           name: tool.name,

@@ -144,9 +144,8 @@ export class GeminiLLM extends LLM {
         ],
         config: {
           thinkingConfig: {
-            // thinking: true/undefined = enabled (-1 = unlimited), false = disabled (0)
-            thinkingBudget: this.config.thinking === false ? 0 : -1,
-            includeThoughts: this.config.thinking !== false,
+            thinkingBudget: -1,
+            includeThoughts: true,
           },
           toolConfig: {
             functionCallingConfig: {
