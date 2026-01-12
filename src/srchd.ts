@@ -8,12 +8,6 @@ import { Runner } from "./runner";
 import { isArrayOf, isString, removeNulls } from "./lib/utils";
 import { buildComputerImage } from "./computer/image";
 import { computerId, Computer } from "./computer";
-import { PublicationResource } from "./resources/publication";
-import {
-  getPublicationContent,
-  publicationHeader,
-  reviewHeader,
-} from "./tools/publications";
 import { Model, isModel } from "./models/provider";
 import { MessageResource } from "./resources/messages";
 
@@ -37,12 +31,8 @@ program
   .description("Research experiment management CLI")
   .version("1.0.0");
 
-// Experiment commands
-const experimentCmd = program
-  .command("experiment")
-  .description("Manage experiments");
-
-experimentCmd
+// Create command
+program
   .command("create <name>")
   .description("Create a new experiment")
   .requiredOption(
@@ -116,7 +106,8 @@ experimentCmd
     console.table([e]);
   });
 
-experimentCmd
+// List command
+program
   .command("list")
   .description("List all experiments")
   .action(async () => {
@@ -316,142 +307,6 @@ program
       await Promise.all(runnerPromises);
     } catch (error) {
       return exitWithError(error as any);
-    }
-  });
-
-// Publication commands
-const publicationCmd = program
-  .command("publication")
-  .description("Manage publications");
-
-publicationCmd
-  .command("list <experiment>")
-  .description("List publications for an experiment")
-  .option(
-    "-s, --status <status>",
-    "Filter by status (PUBLISHED, SUBMITTED, REJECTED)",
-    "PUBLISHED",
-  )
-  .option(
-    "-o, --order <order>",
-    "Order by (latest, citations)",
-    "latest",
-  )
-  .option("-l, --limit <limit>", "Maximum number to return", "10")
-  .option("--offset <offset>", "Offset for pagination", "0")
-  .action(async (experimentName, options) => {
-    const experimentRes = await ExperimentResource.findByName(experimentName);
-    if (experimentRes.isErr()) {
-      return exitWithError(experimentRes);
-    }
-
-    const status = options.status.toUpperCase();
-    if (
-      status !== "PUBLISHED" &&
-      status !== "SUBMITTED" &&
-      status !== "REJECTED"
-    ) {
-      return exitWithError(
-        err(
-          "invalid_parameters_error",
-          "Status must be PUBLISHED, SUBMITTED, or REJECTED",
-        ),
-      );
-    }
-
-    const order = options.order;
-    if (order !== "latest" && order !== "citations") {
-      return exitWithError(
-        err(
-          "invalid_parameters_error",
-          "Order must be 'latest' or 'citations'",
-        ),
-      );
-    }
-
-    const limit = parseInt(options.limit);
-    const offset = parseInt(options.offset);
-
-    if (isNaN(limit) || limit < 1) {
-      return exitWithError(
-        err("invalid_parameters_error", "Limit must be a positive integer"),
-      );
-    }
-
-    if (isNaN(offset) || offset < 0) {
-      return exitWithError(
-        err(
-          "invalid_parameters_error",
-          "Offset must be a non-negative integer",
-        ),
-      );
-    }
-
-    const publications =
-      await PublicationResource.listPublishedByExperiment(
-        experimentRes.value,
-        {
-          order: order as "latest" | "citations",
-          status: status as "PUBLISHED" | "SUBMITTED" | "REJECTED",
-          limit,
-          offset,
-        },
-      );
-
-    if (publications.length === 0) {
-      console.log("No publications found.");
-      return;
-    }
-
-    for (const pub of publications) {
-      console.log(publicationHeader(pub));
-      console.log("");
-    }
-  });
-
-publicationCmd
-  .command("view <experiment> <reference>")
-  .description("View a specific publication")
-  .action(async (experimentName, reference) => {
-    const experimentRes = await ExperimentResource.findByName(experimentName);
-    if (experimentRes.isErr()) {
-      return exitWithError(experimentRes);
-    }
-
-    const publication = await PublicationResource.findByReference(
-      experimentRes.value,
-      reference,
-    );
-    if (!publication) {
-      return exitWithError(
-        err("not_found_error", `Publication not found: ${reference}`),
-      );
-    }
-
-    const content = getPublicationContent(reference);
-    if (!content) {
-      return exitWithError(
-        err("not_found_error", "Publication content not found"),
-      );
-    }
-
-    console.log(publicationHeader(publication));
-    console.log("");
-    console.log(content);
-
-    const pubData = publication.toJSON();
-    if (pubData.status === "PUBLISHED") {
-      console.log("");
-      console.log("=".repeat(80));
-      console.log("REVIEWS:");
-      console.log("=".repeat(80));
-      for (const review of pubData.reviews) {
-        console.log("");
-        console.log(reviewHeader(review));
-        console.log("");
-        console.log(review.content);
-        console.log("-".repeat(80));
-      }
     }
   });
 
