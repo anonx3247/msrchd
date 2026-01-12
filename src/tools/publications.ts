@@ -3,13 +3,15 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { errorToCallToolResult } from "@app/lib/mcp";
 import { PublicationResource, Review } from "@app/resources/publication";
 import { ExperimentResource } from "@app/resources/experiment";
+import { SolutionResource } from "@app/resources/solutions";
 import { err } from "@app/lib/error";
-import { PUBLICATIONS_SERVER_NAME as SERVER_NAME } from "@app/tools/constants";
 import { RunConfig } from "@app/runner/config";
 import { computerId, Computer } from "@app/computer";
 import { newID6 } from "@app/lib/utils";
 import fs from "fs";
 import path from "path";
+
+const SERVER_NAME = "publications";
 
 const SERVER_VERSION = "0.1.0";
 
@@ -107,7 +109,6 @@ export async function createPublicationsServer(
   experiment: ExperimentResource,
   agentIndex: number,
   config: RunConfig,
-  hasComputerTool: boolean,
 ): Promise<McpServer> {
   const server = new McpServer({
     name: SERVER_NAME,
@@ -235,13 +236,12 @@ ${r.content}`;
         .describe(
           "Full content of the publication. Use [{ref}] or [{ref},{ref}] inlined in content for citations.",
         ),
-      ...(hasComputerTool ? {
-        attachments: z
-          .array(z.string())
-          .optional()
-          .describe(
-            "Optional paths to files in your computer to attach to the publication.",
-          ) } : {}),
+      attachments: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "Optional paths to files in your computer to attach to the publication.",
+        ),
     },
     async ({ title, content, attachments }) => {
       const pendingReviews =
@@ -313,7 +313,7 @@ ${r.content}`;
         return errorToCallToolResult(publication);
       }
 
-      if (attachments && hasComputerTool) {
+      if (attachments) {
         const attachmentsDir = getAttachmentPath(reference);
 
         // Ensure attachments directory exists
@@ -359,53 +359,51 @@ ${r.content}`;
     },
   );
 
-  if (hasComputerTool) {
-    server.tool(
-      "download_publication_attachments",
-      "Download the attachments of a publication to your computer. The attachments will be saved under the folder /home/agent/publications/`${reference}` in your computer.",
-      {
-        reference: z.string().describe("Reference of the publication."),
-      },
-      async ({ reference }) => {
-        const publication = await PublicationResource.findByReference(
-          experiment,
-          reference,
+  server.tool(
+    "download_publication_attachments",
+    "Download the attachments of a publication to your computer. The attachments will be saved under the folder /home/agent/publications/`${reference}` in your computer.",
+    {
+      reference: z.string().describe("Reference of the publication."),
+    },
+    async ({ reference }) => {
+      const publication = await PublicationResource.findByReference(
+        experiment,
+        reference,
+      );
+      if (!publication) {
+        return errorToCallToolResult(
+          err("not_found_error", "Publication not found"),
         );
-        if (!publication) {
-          return errorToCallToolResult(
-            err("not_found_error", "Publication not found"),
-          );
-        }
+      }
 
-        const attachmentsDir = getAttachmentPath(reference);
-        if (!fs.existsSync(attachmentsDir)) {
-          return errorToCallToolResult(
-            err("not_found_error", "Attachment files not found"),
-          );
-        }
-
-        const copyRes = await Computer.copyToComputer(
-          computerId(experiment, agentIndex),
-          attachmentsDir,
-          "publications",
+      const attachmentsDir = getAttachmentPath(reference);
+      if (!fs.existsSync(attachmentsDir)) {
+        return errorToCallToolResult(
+          err("not_found_error", "Attachment files not found"),
         );
+      }
 
-        if (copyRes.isErr()) {
-          return errorToCallToolResult(copyRes);
-        }
+      const copyRes = await Computer.copyToComputer(
+        computerId(experiment, agentIndex),
+        attachmentsDir,
+        "publications",
+      );
 
-        return {
-          isError: false,
-          content: [
-            {
-              type: "text",
-              text: `Attachment downloaded to /home/agent/publications/${reference}.`,
-            },
-          ],
-        };
-      },
-    );
-  }
+      if (copyRes.isErr()) {
+        return errorToCallToolResult(copyRes);
+      }
+
+      return {
+        isError: false,
+        content: [
+          {
+            type: "text",
+            text: `Attachment downloaded to /home/agent/publications/${reference}.`,
+          },
+        ],
+      };
+    },
+  );
 
   server.tool(
     "list_review_requests",
@@ -499,6 +497,53 @@ ${r.content}`;
           {
             type: "text",
             text: `Review submitted for publication [${reference}].`,
+          },
+        ],
+      };
+    },
+  );
+
+  server.tool(
+    "vote_solution",
+    "Report belief that a publication is the current best/valid solution towards the research goal.",
+    {
+      publication: z
+        .string()
+        .describe("The reference of the publication."),
+    },
+    async ({ publication: reference }) => {
+      const publication = await PublicationResource.findByReference(
+        experiment,
+        reference,
+      );
+
+      if (!publication) {
+        return errorToCallToolResult(
+          err("not_found_error", "Publication not found"),
+        );
+      }
+      if (publication.toJSON().status !== "PUBLISHED") {
+        return errorToCallToolResult(
+          err("invalid_parameters_error", "Publication is not published"),
+        );
+      }
+
+      const voteResult = await SolutionResource.vote(
+        experiment.toJSON().id,
+        agentIndex,
+        publication.toJSON().id,
+      );
+
+      if (voteResult.isErr()) {
+        return errorToCallToolResult(voteResult);
+      }
+
+      return {
+        isError: false,
+        content: [
+          {
+            type: "text",
+            text: `Successfully reported.`,
           },
         ],
       };

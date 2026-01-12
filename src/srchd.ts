@@ -150,8 +150,6 @@ program
   )
   .option("--max-cost <cost>", "Max cost (in dollars) before stopping run")
   .option("--no-thinking", "Disable extended thinking (enabled by default)")
-  .option("--no-computer", "Disable computer tool (enabled by default)")
-  .option("--no-web", "Disable web tool (enabled by default)")
   .action(async (experimentName, options) => {
     // Find experiment
     const experimentRes = await ExperimentResource.findByName(experimentName);
@@ -163,15 +161,6 @@ program
 
     // Calculate reviewers: 4 unless we have less than 5 agents
     const reviewers = agentCount >= 5 ? 4 : agentCount - 1;
-
-    // Determine tools: computer and web are enabled by default
-    const tools: string[] = [];
-    if (options.computer !== false) {
-      tools.push("computer");
-    }
-    if (options.web !== false) {
-      tools.push("web");
-    }
 
     // Determine which agents to run
     const agentIndices: number[] = [];
@@ -195,29 +184,17 @@ program
       }
     }
 
-    // Build Docker image if computer tool is enabled
-    const hasComputer = tools.includes("computer");
-    if (hasComputer) {
-      const experimentData = experiment.toJSON();
-      console.log(`Building Docker image for ${experimentData.profile} profile...`);
-      const buildRes = await buildComputerImage(experimentData.profile);
-      if (buildRes.isErr()) {
-        return exitWithError(buildRes);
-      }
-      console.log("Docker image built successfully.");
+    // Build Docker image
+    const experimentData = experiment.toJSON();
+    console.log(`Building Docker image for ${experimentData.profile} profile...`);
+    const buildRes = await buildComputerImage(experimentData.profile);
+    if (buildRes.isErr()) {
+      return exitWithError(buildRes);
     }
+    console.log("Docker image built successfully.");
 
     // Copy paths to computers if specified
     if (options.path && isArrayOf(options.path, isString)) {
-      if (!hasComputer) {
-        return exitWithError(
-          err(
-            "invalid_parameters_error",
-            "Cannot copy paths without computer tool enabled",
-          ),
-        );
-      }
-
       for (const agentIndex of agentIndices) {
         for (const pathStr of options.path) {
           const res = await Computer.copyToComputer(
@@ -250,7 +227,6 @@ program
       agentIndices.map((agentIndex) =>
         Runner.builder(experiment, agentIndex, {
           reviewers,
-          tools: tools as any,
           thinking: options.thinking,
         }),
       ),

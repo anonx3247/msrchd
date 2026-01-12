@@ -19,8 +19,7 @@ import { createClientServerPair, errorToCallToolResult } from "@app/lib/mcp";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { concurrentExecutor } from "@app/lib/async";
 import { assertNever } from "@app/lib/assert";
-import { createServer } from "@app/tools";
-import { DEFAULT_TOOLS } from "@app/tools/constants";
+import { createComputerServer, createPublicationsServer } from "@app/tools";
 import { RunConfig } from "./config";
 import { createLLM } from "@app/models/provider";
 import { readFileSync } from "fs";
@@ -66,11 +65,10 @@ export class Runner {
     agentIndex: number,
     config: RunConfig,
   ): Promise<Result<Runner>> {
-    const servers = await Promise.all(
-      [...config.tools, ...DEFAULT_TOOLS].map((t) =>
-        createServer(t, { experiment, agentIndex, config }),
-      ),
-    );
+    const servers = await Promise.all([
+      createComputerServer(experiment, agentIndex),
+      createPublicationsServer(experiment, agentIndex, config),
+    ]);
     const clients = await Promise.all(
       servers.map(async (s) => {
         const [client] = await createClientServerPair(s);
