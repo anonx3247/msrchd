@@ -473,4 +473,32 @@ publicationCmd
     }
   });
 
+// Serve command - start web server
+program
+  .command("serve")
+  .description("Start web server to view experiments")
+  .option("-p, --port <port>", "Port to listen on", "3000")
+  .option("-h, --host <host>", "Host to bind to", "localhost")
+  .action(async (options) => {
+    const port = parseInt(options.port);
+    if (isNaN(port) || port < 1 || port > 65535) {
+      return exitWithError(
+        err("invalid_parameters_error", "Port must be between 1 and 65535"),
+      );
+    }
+
+    const { createApp } = await import("./server");
+    const app = createApp();
+
+    console.log(`Starting web server on http://${options.host}:${port}`);
+    console.log(`Press Ctrl+C to stop`);
+
+    const { serve } = await import("@hono/node-server");
+    serve({
+      fetch: app.fetch,
+      port,
+      hostname: options.host,
+    });
+  });
+
 program.parse();
