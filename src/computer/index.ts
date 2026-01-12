@@ -251,6 +251,18 @@ export class Computer {
       ? `${DEFAULT_WORKDIR}/${destinationDir}`
       : DEFAULT_WORKDIR;
 
+    // Ensure destination directory exists before copying
+    if (destinationDir) {
+      const mkdirRes = await computer.execute(`mkdir -p "${destinationPath}"`);
+      if (mkdirRes.isErr()) {
+        return err(
+          "copy_file_error",
+          `Failed to create destination directory: ${mkdirRes.error.message}`,
+          mkdirRes.error.cause,
+        );
+      }
+    }
+
     try {
       await computer.container.putArchive(pack, { path: destinationPath });
       return ok(undefined);
