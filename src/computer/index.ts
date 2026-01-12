@@ -135,11 +135,14 @@ export class Computer {
     computerId: string,
     imageName?: string,
   ): Promise<Result<Computer>> {
+    const expectedImage = imageName ?? DEFAULT_COMPUTER_IMAGE;
     const c = await Computer.findById(computerId);
     if (c) {
       const status = await c.status();
-      if (status !== "running") {
-        // Container is not running, recreate it
+      const currentImage = await c.getImage();
+
+      // Recreate container if not running or using wrong image
+      if (status !== "running" || currentImage !== expectedImage) {
         await c.terminate();
         return Computer.create(computerId, imageName);
       }
@@ -290,6 +293,15 @@ export class Computer {
       return inspect.State.Status;
     } catch (_err) {
       return "NotFound";
+    }
+  }
+
+  async getImage(): Promise<string | null> {
+    try {
+      const inspect = await this.container.inspect();
+      return inspect.Config.Image;
+    } catch (_err) {
+      return null;
     }
   }
 
