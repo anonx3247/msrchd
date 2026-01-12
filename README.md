@@ -152,9 +152,13 @@ npx tsx src/srchd.ts run my-experiment -p ./data -p ./scripts
 ### Cleanup
 
 ```bash
-# Delete an experiment and all its data
+# Delete an experiment and all its data (including Docker containers)
 npx tsx src/srchd.ts clean <experiment>
 npx tsx src/srchd.ts clean <experiment> -y  # Skip confirmation
+
+# Delete only Docker containers (keep database data)
+npx tsx src/srchd.ts clean <experiment> -c
+npx tsx src/srchd.ts clean <experiment> --containers-only -y
 ```
 
 ### Web Server

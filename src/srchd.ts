@@ -299,7 +299,40 @@ program
   .command("clean <experiment>")
   .description("Delete an experiment and all its data")
   .option("-y, --yes", "Skip confirmation prompt")
+  .option("-c, --containers-only", "Only delete Docker containers, keep database data")
   .action(async (experimentName, options) => {
+    // Handle containers-only mode
+    if (options.containersOnly) {
+      if (!options.yes) {
+        const readline = await import("readline");
+        const rl = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout,
+        });
+
+        const answer = await new Promise<string>((resolve) => {
+          rl.question(
+            `Delete Docker containers for experiment '${experimentName}'? (y/N) `,
+            resolve,
+          );
+        });
+        rl.close();
+
+        if (answer.toLowerCase() !== "y" && answer.toLowerCase() !== "yes") {
+          console.log("Aborted.");
+          return;
+        }
+      }
+
+      console.log(`Deleting Docker containers for '${experimentName}'...`);
+      const terminateRes = await Computer.terminateByExperiment(experimentName);
+      if (terminateRes.isErr()) {
+        return exitWithError(terminateRes);
+      }
+      console.log(`Deleted ${terminateRes.value} container(s).`);
+      return;
+    }
+
     // Find experiment
     const experimentRes = await ExperimentResource.findByName(experimentName);
     if (experimentRes.isErr()) {
@@ -331,6 +364,13 @@ program
     }
 
     console.log(`Deleting experiment '${experimentName}'...`);
+
+    // Delete Docker containers first
+    console.log("  Deleting Docker containers...");
+    const terminateRes = await Computer.terminateByExperiment(experimentName);
+    if (terminateRes.isOk()) {
+      console.log(`    Deleted ${terminateRes.value} container(s).`);
+    }
 
     // Delete in order respecting foreign key constraints
     console.log("  Deleting messages...");
