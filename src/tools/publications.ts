@@ -61,12 +61,8 @@ grade=${review.grade ?? "PENDING"}`;
 };
 
 
-export function getAttachmentPath(experimentId: number, reference: string, filename?: string) {
-  const pth = [
-    "attachments",
-    `${experimentId}`,
-    `${reference}`,
-  ];
+export function getAttachmentPath(reference: string, filename?: string) {
+  const pth = ["publications", reference];
   if (filename) {
     pth.push(path.basename(filename));
   }
@@ -76,10 +72,9 @@ export function getAttachmentPath(experimentId: number, reference: string, filen
 export const publicationHeader = (
   publication: PublicationResource,
 ) => {
-  const experimentId = publication.toJSON().experiment;
   const reference = publication.toJSON().reference;
 
-  const attachmentsDir = getAttachmentPath(experimentId, reference);
+  const attachmentsDir = getAttachmentPath(reference);
   const attachments = fs.existsSync(attachmentsDir) ? fs.readdirSync(attachmentsDir) : [];
 
   return `\
@@ -319,7 +314,7 @@ ${r.content}`;
       }
 
       if (attachments && hasComputerTool) {
-        const attachmentsDir = getAttachmentPath(experiment.toJSON().id, reference);
+        const attachmentsDir = getAttachmentPath(reference);
 
         // Ensure attachments directory exists
         if (!fs.existsSync(attachmentsDir)) {
@@ -327,7 +322,7 @@ ${r.content}`;
         }
 
         for (const attachmentPath of attachments) {
-          const localFilePath = getAttachmentPath(experiment.toJSON().id, reference, attachmentPath);
+          const localFilePath = getAttachmentPath(reference, attachmentPath);
           const copyRes = await Computer.copyFromComputer(
             computerId(experiment, agentIndex),
             attachmentPath,
@@ -382,7 +377,7 @@ ${r.content}`;
           );
         }
 
-        const attachmentsDir = getAttachmentPath(publication.experiment.toJSON().id, reference);
+        const attachmentsDir = getAttachmentPath(reference);
         if (!fs.existsSync(attachmentsDir)) {
           return errorToCallToolResult(
             err("not_found_error", "Attachment files not found"),
