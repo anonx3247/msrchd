@@ -419,12 +419,12 @@ export const createApp = () => {
     const attachmentsContent =
       attachments.length > 0
         ? `
-        <div class="detail-label">Attachments</div>
-        <div class="attachment-list">
+        <div class="detail-label">Files</div>
+        <div class="file-list">
           ${attachments
             .map(
               (att) => `
-            <div class="attachment-item">
+            <div class="file-item">
               <a href="/experiments/${sanitizeText(experimentName)}/publications/${sanitizeText(reference)}/attachments/${sanitizeText(att)}">
                 ${sanitizeText(att)}
               </a>

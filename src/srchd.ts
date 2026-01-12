@@ -10,6 +10,15 @@ import { buildComputerImage } from "./computer/image";
 import { computerId, Computer } from "./computer";
 import { Model, isModel } from "./models/provider";
 import { MessageResource } from "./resources/messages";
+import { db } from "./db";
+import {
+  messages,
+  reviews,
+  citations,
+  solutions,
+  publications,
+} from "./db/schema";
+import { eq } from "drizzle-orm";
 
 const exitWithError = (err: Err<SrchdError>) => {
   console.error(
@@ -82,7 +91,7 @@ program
     }
 
     // Validate profile
-    const validProfiles = ["research", "formal-math", "security"];
+    const validProfiles = ["research", "formal-math", "security", "arc-agi"];
     if (!validProfiles.includes(options.profile)) {
       return exitWithError(
         err(
@@ -101,9 +110,11 @@ program
     });
 
     const e = experiment.toJSON();
-    e.problem =
-      e.problem.substring(0, 32) + (e.problem.length > 32 ? "..." : "");
-    console.table([e]);
+    console.log(`\nExperiment created:`);
+    console.log(`  Name:    ${e.name}`);
+    console.log(`  Model:   ${e.model}`);
+    console.log(`  Agents:  ${e.agent_count}`);
+    console.log(`  Profile: ${e.profile}`);
   });
 
 // List command
@@ -114,17 +125,17 @@ program
     const experiments = await ExperimentResource.all();
 
     if (experiments.length === 0) {
-      return exitWithError(err("not_found_error", "No experiments found."));
+      console.log("No experiments found.");
+      return;
     }
 
-    console.table(
-      experiments.map((exp) => {
-        const e = exp.toJSON();
-        e.problem =
-          e.problem.substring(0, 32) + (e.problem.length > 32 ? "..." : "");
-        return e;
-      }),
-    );
+    console.log(`\nExperiments (${experiments.length}):\n`);
+    for (const exp of experiments) {
+      const e = exp.toJSON();
+      console.log(`  ${e.name}`);
+      console.log(`    Model: ${e.model}, Agents: ${e.agent_count}, Profile: ${e.profile}`);
+      console.log();
+    }
   });
 
 
@@ -305,6 +316,66 @@ program
     } catch (error) {
       return exitWithError(error as any);
     }
+  });
+
+// Clean command - delete an experiment and all its data
+program
+  .command("clean <experiment>")
+  .description("Delete an experiment and all its data")
+  .option("-y, --yes", "Skip confirmation prompt")
+  .action(async (experimentName, options) => {
+    // Find experiment
+    const experimentRes = await ExperimentResource.findByName(experimentName);
+    if (experimentRes.isErr()) {
+      return exitWithError(experimentRes);
+    }
+    const experiment = experimentRes.value;
+    const expId = experiment.toJSON().id;
+
+    // Confirm unless -y flag is passed
+    if (!options.yes) {
+      const readline = await import("readline");
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+
+      const answer = await new Promise<string>((resolve) => {
+        rl.question(
+          `Delete experiment '${experimentName}' and all its data? (y/N) `,
+          resolve,
+        );
+      });
+      rl.close();
+
+      if (answer.toLowerCase() !== "y" && answer.toLowerCase() !== "yes") {
+        console.log("Aborted.");
+        return;
+      }
+    }
+
+    console.log(`Deleting experiment '${experimentName}'...`);
+
+    // Delete in order respecting foreign key constraints
+    console.log("  Deleting messages...");
+    db.delete(messages).where(eq(messages.experiment, expId)).run();
+
+    console.log("  Deleting reviews...");
+    db.delete(reviews).where(eq(reviews.experiment, expId)).run();
+
+    console.log("  Deleting citations...");
+    db.delete(citations).where(eq(citations.experiment, expId)).run();
+
+    console.log("  Deleting solutions...");
+    db.delete(solutions).where(eq(solutions.experiment, expId)).run();
+
+    console.log("  Deleting publications...");
+    db.delete(publications).where(eq(publications.experiment, expId)).run();
+
+    console.log("  Deleting experiment...");
+    await experiment.delete();
+
+    console.log(`\nExperiment '${experimentName}' deleted.`);
   });
 
 // Serve command - start web server
