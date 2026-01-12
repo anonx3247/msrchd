@@ -19,6 +19,7 @@ import {
   publications,
 } from "./db/schema";
 import { eq } from "drizzle-orm";
+import { spawn } from "child_process";
 
 const exitWithError = (err: Err<SrchdError>) => {
   console.error(
@@ -267,7 +268,34 @@ program
 
     let tickCount = 0;
     let lastCost = await MessageResource.totalCostForExperiment(experiment);
-    let stopRequested = false;
+
+    // Fast shutdown - spawn background process to stop containers and exit immediately
+    const fastShutdown = (reason: string) => {
+      console.log(`\n\x1b[33m${reason}\x1b[0m`);
+      console.log("Stopping containers in background...");
+
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(false);
+      }
+
+      // Spawn detached process to stop containers in background
+      const child = spawn(
+        process.execPath,
+        [
+          "-e",
+          `require("${__dirname}/computer").Computer.stopByExperiment("${experimentName}").then(() => process.exit(0))`,
+        ],
+        {
+          detached: true,
+          stdio: "ignore",
+          cwd: process.cwd(),
+          env: process.env,
+        },
+      );
+      child.unref();
+
+      process.exit(0);
+    };
 
     // Set up keyboard listener for 'q' to quit
     if (process.stdin.isTTY) {
@@ -276,42 +304,27 @@ program
       process.stdin.on("data", (key) => {
         const char = key.toString();
         if (char === "q" || char === "Q") {
-          stopRequested = true;
-          console.log("\n\x1b[33mQuit requested, finishing current ticks...\x1b[0m");
+          fastShutdown("Quit requested.");
         }
         // Also handle Ctrl+C
         if (char === "\x03") {
-          stopRequested = true;
-          console.log("\n\x1b[33mInterrupted, stopping...\x1b[0m");
+          fastShutdown("Interrupted.");
         }
       });
     }
 
     // Display instructions
-    console.log("\x1b[36mPress 'q' to quit gracefully (containers will be stopped, data preserved)\x1b[0m\n");
-
-    // Graceful shutdown function
-    const gracefulShutdown = async () => {
-      console.log("\n\x1b[33mStopping containers...\x1b[0m");
-      const stopRes = await Computer.stopByExperiment(experimentName);
-      if (stopRes.isOk()) {
-        console.log(`Stopped ${stopRes.value} container(s). Data preserved in volumes.`);
-      }
-      if (process.stdin.isTTY) {
-        process.stdin.setRawMode(false);
-      }
-      process.exit(0);
-    };
+    console.log("\x1b[36mPress 'q' to quit (containers will be stopped in background, data preserved)\x1b[0m\n");
 
     // For continuous running, start each agent in its own independent loop
     const runnerPromises = runners.map(async (runner) => {
-      while (!stopRequested) {
+      while (true) {
         if (maxCost && shouldCheck(tickCount, lastCost, maxCost)) {
           lastCost = await MessageResource.totalCostForExperiment(experiment);
           if (lastCost > maxCost) {
             console.log(`\nCost limit reached: $${lastCost.toFixed(2)}`);
-            stopRequested = true;
-            break;
+            fastShutdown("Cost limit reached.");
+            return;
           }
         }
 
@@ -327,9 +340,8 @@ program
     // Wait for agents to finish or stop
     try {
       await Promise.all(runnerPromises);
-      await gracefulShutdown();
     } catch (error) {
-      await gracefulShutdown();
+      fastShutdown("Error occurred.");
       return exitWithError(error as any);
     }
   });

@@ -149,10 +149,9 @@ npx tsx src/srchd.ts run my-experiment --tick 0
 npx tsx src/srchd.ts run my-experiment -p ./data -p ./scripts
 ```
 
-**Stopping a run**: Press `q` to quit gracefully. This will:
-- Finish current agent ticks
-- Stop Docker containers (but preserve data in volumes)
-- Exit cleanly
+**Stopping a run**: Press `q` to quit immediately. This will:
+- Exit instantly (no waiting for current ticks)
+- Stop Docker containers in background (data preserved in volumes)
 
 Data persists between runs via Docker volumes, so you can resume where you left off.
 
