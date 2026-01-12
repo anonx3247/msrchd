@@ -166,6 +166,31 @@ export class Computer {
     }
   }
 
+  static async stopByExperiment(
+    experimentName: string,
+  ): Promise<Result<number>> {
+    const prefix = `${experimentName}-agent-`;
+    const listRes = await Computer.listComputerIds();
+    if (listRes.isErr()) {
+      return listRes;
+    }
+
+    const matchingIds = listRes.value.filter((id) => id.startsWith(prefix));
+    let stopped = 0;
+
+    for (const id of matchingIds) {
+      const computer = await Computer.findById(id);
+      if (computer) {
+        const res = await computer.stop();
+        if (res.isOk()) {
+          stopped++;
+        }
+      }
+    }
+
+    return ok(stopped);
+  }
+
   static async terminateByExperiment(
     experimentName: string,
   ): Promise<Result<number>> {
@@ -327,6 +352,24 @@ export class Computer {
       return inspect.Config.Image;
     } catch (_err) {
       return null;
+    }
+  }
+
+  async stop(): Promise<Result<boolean>> {
+    try {
+      try {
+        await this.container.stop({ t: 5 });
+      } catch (_err) {
+        // ignore if already stopped
+      }
+      await this.container.remove({ v: false, force: true });
+      return ok(true);
+    } catch (error: any) {
+      return err(
+        "computer_run_error",
+        `Failed to stop computer: ${error.message}`,
+        error,
+      );
     }
   }
 
