@@ -15,7 +15,7 @@ import { BetaUsage } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 
 const DEFAULT_TIMEOUT = 600000 * 2; // 20 minutes (double the default)
 const DEFAULT_MAX_TOKENS = 8192;
-const DEFAULT_THINKING_TOKENS = 4096;
+const DEFAULT_THINKING_TOKENS = 8192;
 
 type AnthropicTokenPrices = {
   baseInput: number;
