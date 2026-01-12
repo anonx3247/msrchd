@@ -305,7 +305,6 @@ export const createApp = () => {
     }
 
     const pubData = publication.toJSON();
-    const expData = experiment.toJSON();
 
     const content = getPublicationContent(reference);
     if (!content) {
