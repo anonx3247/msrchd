@@ -5,7 +5,7 @@ import { spawn, execSync } from 'child_process';
 import * as path from 'path';
 import * as readline from 'readline';
 import { db } from '@app/db/index';
-import { experiments, agents, solutions, publications, messages, evolutions, reviews, citations, token_usages } from '@app/db/schema';
+import { experiments, solutions, publications, messages, reviews, citations } from '@app/db/schema';
 import { eq } from 'drizzle-orm';
 
 // Parse range expression like "1-5,8,22-25" into array of numbers
@@ -82,11 +82,14 @@ function runCommand(
       index.toString(),
       '-a',
       agents.toString(),
-      '-b',
-      budget.toString(),
     ];
 
-    if (model) {
+    // Only add budget for run command
+    if (command === 'run') {
+      args.push('-b', budget.toString());
+    }
+
+    if (model && command === 'run') {
       args.push('-m', model);
     }
 
@@ -103,7 +106,7 @@ function runCommand(
     // Pipe output with labels
     console.log(`${label} Starting...`);
     const proc = spawn('npx', ['tsx', ...args], {
-      cwd: path.join(__dirname, '../../..'),
+      cwd: path.join(__dirname, '..'),
       stdio: 'pipe',
     });
 
@@ -131,16 +134,16 @@ function runCommand(
 
     proc.on('close', (code) => {
       if (code === 0) {
-        console.log(`${label} ✅ Success`);
+        console.log(`${label} [OK] Success`);
         resolve({ success: true, index, agents });
       } else {
-        console.error(`${label} ❌ Failed (exit code ${code})`);
+        console.error(`${label} [!!] Failed (exit code ${code})`);
         resolve({ success: false, index, agents });
       }
     });
 
     proc.on('error', (error) => {
-      console.error(`${label} ❌ Error: ${error.message}`);
+      console.error(`${label} [!!] Error: ${error.message}`);
       resolve({ success: false, index, agents });
     });
   });
@@ -174,7 +177,7 @@ async function main() {
     })
     .action(async (indexesExpr, options) => {
       if (!options.agents || !options.budget) {
-        console.error('\n❌ Error: Both --agents and --budget options are required');
+        console.error('\n[ERROR] Both --agents and --budget options are required');
         console.error('Usage: npx tsx batch_runner.ts run <indexes> -a <agents> -b <budget> [-m <model>] [-v <variant>] [-c <concurrency>]');
         console.error('Example: npx tsx batch_runner.ts run 1-5,8 -a 3-5 -b 50 -m deepseek-reasoner -v test1 -c 4\n');
         process.exit(1);
@@ -184,8 +187,8 @@ async function main() {
         const indexes = parseRangeExpression(indexesExpr);
         const agentCounts = parseRangeExpression(options.agents);
 
-        console.log(`\n📦 Batch mode: ${indexes.length} problem(s) × ${agentCounts.length} agent config(s) = ${indexes.length * agentCounts.length} total run(s)`);
-        console.log(`🚀 Running experiments concurrently${options.concurrency ? ` (max ${options.concurrency} at a time)` : ''}...\n`);
+        console.log(`\nBatch mode: ${indexes.length} problem(s) x ${agentCounts.length} agent config(s) = ${indexes.length * agentCounts.length} total run(s)`);
+        console.log(`Running experiments concurrently${options.concurrency ? ` (max ${options.concurrency} at a time)` : ''}...\n`);
 
         // Create all combinations
         const tasks: Array<{ index: number; agents: number }> = [];
@@ -259,14 +262,14 @@ async function main() {
         const failCount = results.filter(r => !r.success).length;
 
         console.log(`\n${'='.repeat(80)}`);
-        console.log(`📊 Batch Summary: ${successCount} succeeded, ${failCount} failed`);
+        console.log(`Batch Summary: ${successCount} succeeded, ${failCount} failed`);
         console.log('='.repeat(80) + '\n');
 
         if (failCount > 0) {
           process.exit(1);
         }
       } catch (error) {
-        console.error(`\n❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(`\n[ERROR] ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
       }
     });
@@ -276,17 +279,12 @@ async function main() {
     .description('Verify multiple experiments')
     .argument('<indexes>', 'Problem index range (e.g., 1-5,8,22-25)')
     .option('-a, --agents <range>', 'Number of agents range (e.g., 2-4,6)')
-    .option('-b, --budget <number>', 'Total cost budget', (val) => {
-      const num = parseFloat(val);
-      if (isNaN(num)) throw new Error('Budget must be a number');
-      return num;
-    })
     .option('-v, --variant <variant>', 'Experiment variant name')
     .action(async (indexesExpr, options) => {
-      if (!options.agents || !options.budget) {
-        console.error('\n❌ Error: Both --agents and --budget options are required');
-        console.error('Usage: npx tsx batch_runner.ts verify <indexes> -a <agents> -b <budget> [-v <variant>]');
-        console.error('Example: npx tsx batch_runner.ts verify 1-5,8 -a 3-5 -b 50 -v test1\n');
+      if (!options.agents) {
+        console.error('\n[ERROR] The --agents option is required');
+        console.error('Usage: npx tsx batch_runner.ts verify <indexes> -a <agents> [-v <variant>]');
+        console.error('Example: npx tsx batch_runner.ts verify 1-5,8 -a 3-5 -v test1\n');
         process.exit(1);
       }
 
@@ -294,7 +292,7 @@ async function main() {
         const indexes = parseRangeExpression(indexesExpr);
         const agentCounts = parseRangeExpression(options.agents);
 
-        console.log(`\n📦 Batch mode: ${indexes.length} problem(s) × ${agentCounts.length} agent config(s) = ${indexes.length * agentCounts.length} total verification(s)\n`);
+        console.log(`\nBatch mode: ${indexes.length} problem(s) x ${agentCounts.length} agent config(s) = ${indexes.length * agentCounts.length} total verification(s)\n`);
 
         // Create all combinations
         const tasks: Array<{ index: number; agents: number }> = [];
@@ -312,7 +310,7 @@ async function main() {
             'verify',
             task.index,
             task.agents,
-            options.budget,
+            0, // budget not used for verify
             undefined,
             options.variant
           );
@@ -324,14 +322,14 @@ async function main() {
         const failCount = results.filter(r => !r.success).length;
 
         console.log(`\n${'='.repeat(80)}`);
-        console.log(`📊 Batch Summary: ${successCount} verified, ${failCount} failed`);
+        console.log(`Batch Summary: ${successCount} verified, ${failCount} failed`);
         console.log('='.repeat(80) + '\n');
 
         if (failCount > 0) {
           process.exit(1);
         }
       } catch (error) {
-        console.error(`\n❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(`\n[ERROR] ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
       }
     });
@@ -341,18 +339,13 @@ async function main() {
     .description('Clean up multiple experiment resources')
     .argument('<indexes>', 'Problem index range (e.g., 1-5,8,22-25)')
     .option('-a, --agents <range>', 'Number of agents range (e.g., 2-4,6)')
-    .option('-b, --budget <number>', 'Total cost budget', (val) => {
-      const num = parseFloat(val);
-      if (isNaN(num)) throw new Error('Budget must be a number');
-      return num;
-    })
     .option('-v, --variant <variant>', 'Experiment variant name')
     .option('--data', 'Also delete all database data for the experiments')
     .action(async (indexesExpr, options) => {
-      if (!options.agents || !options.budget) {
-        console.error('\n❌ Error: Both --agents and --budget options are required');
-        console.error('Usage: npx tsx batch_runner.ts clean <indexes> -a <agents> -b <budget> [-v <variant>] [--data]');
-        console.error('Example: npx tsx batch_runner.ts clean 1-5,8 -a 3-5 -b 50 -v test1 --data\n');
+      if (!options.agents) {
+        console.error('\n[ERROR] The --agents option is required');
+        console.error('Usage: npx tsx batch_runner.ts clean <indexes> -a <agents> [-v <variant>] [--data]');
+        console.error('Example: npx tsx batch_runner.ts clean 1-5,8 -a 3-5 -v test1 --data\n');
         process.exit(1);
       }
 
@@ -361,7 +354,7 @@ async function main() {
         const agentCounts = parseRangeExpression(options.agents);
         const problems = loadProblems();
 
-        console.log(`\n📦 Batch mode: ${indexes.length} problem(s) × ${agentCounts.length} agent config(s) = ${indexes.length * agentCounts.length} total clean(s)\n`);
+        console.log(`\nBatch mode: ${indexes.length} problem(s) x ${agentCounts.length} agent config(s) = ${indexes.length * agentCounts.length} total clean(s)\n`);
 
         // Build experiment names
         const experimentNames: string[] = [];
@@ -369,7 +362,7 @@ async function main() {
 
         for (const index of indexes) {
           if (index < 1 || index > problems.length) {
-            console.error(`❌ Invalid index: ${index}. Must be between 1 and ${problems.length}`);
+            console.error(`[ERROR] Invalid index: ${index}. Must be between 1 and ${problems.length}`);
             process.exit(1);
           }
 
@@ -382,19 +375,19 @@ async function main() {
           }
         }
 
-        console.log('🔍 Experiments to clean:');
+        console.log('Experiments to clean:');
         experimentDetails.forEach(detail => {
           console.log(`   - Problem #${detail.index} (${detail.problemId}), ${detail.agents} agent(s): ${detail.experimentName}`);
         });
         console.log('');
 
         // Step 1: Find all matching pods
-        console.log('📦 Finding Kubernetes pods...');
+        console.log('Finding Kubernetes pods...');
 
         try {
           const listResult = execSync('kubectl get pods -o name', {
             encoding: 'utf-8',
-            cwd: path.join(__dirname, '../../..')
+            cwd: path.join(__dirname, '..')
           });
 
           const allPods = listResult.split('\n').filter(line => line.trim());
@@ -423,23 +416,23 @@ async function main() {
 
               // Run deletion in background (detached)
               spawn('sh', ['-c', `kubectl get pods -o name | grep -E '${grepPattern}' | xargs kubectl delete`], {
-                cwd: path.join(__dirname, '../../..'),
+                cwd: path.join(__dirname, '..'),
                 detached: true,
                 stdio: 'ignore'
               }).unref();
 
-              console.log('   ✅ Pod deletion started in background\n');
+              console.log('   [OK] Pod deletion started in background\n');
             } else {
               console.log('   Skipped pod deletion\n');
             }
           }
         } catch (error) {
-          console.error('   ⚠️  Failed to list/delete pods:', error instanceof Error ? error.message : String(error));
+          console.error('   [WARN] Failed to list/delete pods:', error instanceof Error ? error.message : String(error));
         }
 
         // Step 2: Delete database data if requested
         if (options.data) {
-          console.log('🗑️  Finding database data...');
+          console.log('Finding database data...');
 
           const experimentsToDelete: Array<{ name: string; id: number }> = [];
 
@@ -471,27 +464,24 @@ async function main() {
                 const expId = exp.id;
                 console.log(`   - Cleaning experiment: ${exp.name}`);
 
-                db.delete(token_usages).where(eq(token_usages.experiment, expId)).run();
                 db.delete(messages).where(eq(messages.experiment, expId)).run();
-                db.delete(evolutions).where(eq(evolutions.experiment, expId)).run();
                 db.delete(reviews).where(eq(reviews.experiment, expId)).run();
                 db.delete(citations).where(eq(citations.experiment, expId)).run();
                 db.delete(solutions).where(eq(solutions.experiment, expId)).run();
                 db.delete(publications).where(eq(publications.experiment, expId)).run();
-                db.delete(agents).where(eq(agents.experiment, expId)).run();
                 db.delete(experiments).where(eq(experiments.id, expId)).run();
               }
 
-              console.log('   ✅ Database data deleted\n');
+              console.log('   [OK] Database data deleted\n');
             } else {
               console.log('   Skipped database deletion\n');
             }
           }
         }
 
-        console.log('✅ Batch cleanup complete!\n');
+        console.log('[OK] Batch cleanup complete!\n');
       } catch (error) {
-        console.error(`\n❌ Error: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(`\n[ERROR] ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
       }
     });
@@ -500,6 +490,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error('\n❌ Fatal error:', error.message);
+  console.error('\n[FATAL] Fatal error:', error.message);
   process.exit(1);
 });
