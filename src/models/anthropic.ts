@@ -1,12 +1,5 @@
 import { MessageParam } from "@anthropic-ai/sdk/resources/messages";
-import {
-  LLM,
-  ModelConfig,
-  Message,
-  Tool,
-  ToolChoice,
-  TokenUsage,
-} from "./index";
+import { LLM, ModelConfig, Message, Tool, TokenUsage } from "./index";
 import Anthropic from "@anthropic-ai/sdk";
 import { Result, err, ok } from "@app/lib/error";
 import { assertNever } from "@app/lib/assert";
@@ -182,11 +175,8 @@ export class AnthropicLLM extends LLM {
   async run(
     messages: Message[],
     prompt: string,
-    toolChoice: ToolChoice,
     tools: Tool[],
-  ): Promise<
-    Result<{ message: Message; tokenUsage?: TokenUsage  }>
-  > {
+  ): Promise<Result<{ message: Message; tokenUsage?: TokenUsage }>> {
     try {
       const message = await this.client.beta.messages.create({
         model: this.model,
@@ -226,9 +216,7 @@ export class AnthropicLLM extends LLM {
           description: tool.description,
           input_schema: tool.inputSchema as any,
         })),
-        tool_choice: {
-          type: toolChoice,
-        },
+        tool_choice: { type: "auto" },
         betas: ["interleaved-thinking-2025-05-14"],
       });
 
@@ -303,7 +291,6 @@ export class AnthropicLLM extends LLM {
   async tokens(
     messages: Message[],
     prompt: string,
-    toolChoice: ToolChoice,
     tools: Tool[],
   ): Promise<Result<number>> {
     try {
@@ -327,9 +314,7 @@ export class AnthropicLLM extends LLM {
           description: tool.description,
           input_schema: tool.inputSchema as any,
         })),
-        tool_choice: {
-          type: toolChoice,
-        },
+        tool_choice: { type: "auto" },
       });
 
       return ok(response.input_tokens);

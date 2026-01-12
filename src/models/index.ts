@@ -46,11 +46,9 @@ export interface Message {
   content: (TextContent | ToolUse | ToolResult | Thinking)[];
 }
 
-export type ThinkingConfig = boolean;
-
 export interface ModelConfig {
   maxTokens?: number;
-  thinking?: ThinkingConfig;
+  thinking?: boolean;
 }
 
 export interface Tool {
@@ -58,8 +56,6 @@ export interface Tool {
   description?: string;
   inputSchema: JSONSchema;
 }
-
-export type ToolChoice = "auto" | "any" | "none";
 
 export abstract class LLM {
   protected config: ModelConfig;
@@ -71,14 +67,12 @@ export abstract class LLM {
   abstract run(
     messages: Message[],
     prompt: string,
-    toolChoice: ToolChoice,
     tools: Tool[],
   ): Promise<Result<{ message: Message; tokenUsage?: TokenUsage }>>;
 
   abstract tokens(
     messages: Message[],
     prompt: string,
-    toolChoice: ToolChoice,
     tools: Tool[],
   ): Promise<Result<number>>;
 
