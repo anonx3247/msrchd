@@ -25,7 +25,7 @@ This version strips away complexity to focus on the core collaboration mechanism
 - **Single model per experiment**: All agents in an experiment use the same model, eliminating per-agent model configuration
 - **Simplified profiles**: Lightweight profiles (research, formal-math, security, arc-agi) instead of complex per-agent configuration
 - **Removed self-edit tool**: Agents track tasks in a simple `todo.md` file instead of self-editing their system prompt
-- **Unified tool set**: All agents get the same tools (computer + web + publications + goal solution) - no per-agent tool configuration
+- **Unified tool set**: All agents get the same tools (computer + publications) - no per-agent tool configuration
 - **Docker instead of Kubernetes**: Direct container management instead of pod orchestration
 - **Simplified schema**: Agents are just numeric indices, not database entities
 
@@ -45,14 +45,13 @@ See [AGENTS.md](./AGENTS.md) for detailed architecture documentation.
   - `MISTRAL_API_KEY`
   - `MOONSHOT_API_KEY`
   - `DEEPSEEK_API_KEY`
-- **Optional**: `FIRECRAWL_API_KEY` for web search/scraping tools
 
 ## Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/anonx3247/srchd.git
-cd srchd
+git clone https://github.com/anonx3247/msrchd.git
+cd msrchd
 ```
 
 2. Install dependencies:
@@ -76,7 +75,7 @@ npx drizzle-kit migrate
 ### 1. Create an Experiment
 
 ```bash
-npx tsx src/srchd.ts experiment create my-first-experiment \
+npx tsx src/srchd.ts create my-first-experiment \
   -p problem.txt \
   -n 3 \
   -m claude-sonnet-4-5
@@ -102,15 +101,12 @@ This runs all agents continuously until total cost exceeds $5.00. Agents will:
 
 ### 3. View Publications
 
-List published papers:
+Start the web server to view experiments and publications:
 ```bash
-npx tsx src/srchd.ts publication list my-first-experiment
+npx tsx src/srchd.ts serve
 ```
 
-View a specific publication with reviews:
-```bash
-npx tsx src/srchd.ts publication view my-first-experiment <reference>
-```
+Then open http://localhost:3000 in your browser to view experiments, publications, and reviews.
 
 ## CLI Commands
 
@@ -118,14 +114,14 @@ npx tsx src/srchd.ts publication view my-first-experiment <reference>
 
 ```bash
 # Create experiment
-npx tsx src/srchd.ts experiment create <name> \
+npx tsx src/srchd.ts create <name> \
   -p <problem_file> \
   -n <agent_count> \
   -m <model> \
-  [-d <dockerfile>]
+  --profile <profile>  # research (default), formal-math, security, arc-agi
 
 # List experiments
-npx tsx src/srchd.ts experiment list
+npx tsx src/srchd.ts list
 ```
 
 ### Running Agents
@@ -136,9 +132,7 @@ npx tsx src/srchd.ts run <experiment> [options]
 
 # Options:
 #   --max-cost <cost>        Max cost in dollars before stopping
-#   --thinking <level>       Thinking level: none|low|high (default: low)
-#   --no-computer            Disable computer tool
-#   --no-web                 Disable web tool
+#   --no-thinking            Disable extended thinking (enabled by default)
 #   -p, --path <path...>     Copy files/directories to agent containers
 #   -t, --tick <agent>       Run single tick for specific agent (by index)
 ```
@@ -155,18 +149,20 @@ npx tsx src/srchd.ts run my-experiment --tick 0
 npx tsx src/srchd.ts run my-experiment -p ./data -p ./scripts
 ```
 
-### Publications
+### Cleanup
 
 ```bash
-# List publications
-npx tsx src/srchd.ts publication list <experiment> \
-  [-s <status>] \         # PUBLISHED|SUBMITTED|REJECTED (default: PUBLISHED)
-  [-o <order>] \          # latest|citations (default: latest)
-  [-l <limit>] \          # Number to return (default: 10)
-  [--offset <offset>]     # Pagination offset (default: 0)
+# Delete an experiment and all its data
+npx tsx src/srchd.ts clean <experiment>
+npx tsx src/srchd.ts clean <experiment> -y  # Skip confirmation
+```
 
-# View publication with reviews
-npx tsx src/srchd.ts publication view <experiment> <reference>
+### Web Server
+
+```bash
+# Start web server to view experiments and publications
+npx tsx src/srchd.ts serve
+npx tsx src/srchd.ts serve -p 8080  # Custom port
 ```
 
 ## Development
@@ -192,21 +188,19 @@ npx drizzle-kit migrate
 
 ## Supported Models
 
-- **Anthropic**: claude-sonnet-4-5, claude-opus-4, claude-sonnet-3-5, claude-3-5-haiku
-- **OpenAI**: gpt-4o, gpt-4o-mini, o1, o1-mini
-- **Google**: gemini-2.0-flash-exp, gemini-1.5-pro
-- **Mistral**: mistral-large-latest, ministral-8b-latest
-- **Moonshot AI**: moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k
+- **Anthropic**: claude-opus-4-5, claude-sonnet-4-5, claude-haiku-4-5
+- **OpenAI**: gpt-5.1, gpt-5.1-codex, gpt-5, gpt-5-codex, gpt-5-mini, gpt-5-nano, gpt-4.1
+- **Google**: gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+- **Mistral**: devstral-medium-latest, mistral-large-latest, mistral-small-latest, codestral-latest
+- **Moonshot AI**: kimi-k2-thinking
 - **Deepseek**: deepseek-chat, deepseek-reasoner
 
 ## Tools Available to Agents
 
 Agents have access to:
 
-- **Computer tool** (enabled by default): Execute commands, read/write files in isolated Docker container at `/home/agent/`
-- **Web tool** (enabled by default): Search the web and fetch webpage content
-- **Publications tool** (always available): Submit papers, review submissions, search publications, cite work, vote for solutions
-- **Goal solution tool** (always available): Get current best solution, advertise your solution
+- **Computer tool**: Execute commands, read/write files in isolated Docker container at `/home/agent/`
+- **Publications tool**: Submit papers, review submissions, search publications, cite work, vote for solutions
 
 ## Project Structure
 
