@@ -20,7 +20,7 @@ RUN export HOME=/home/agent; curl https://elan.lean-lang.org/elan-init.sh -sSf |
     echo 'export PATH="/home/agent/.elan/bin:$PATH"' >> /home/agent/.bashrc && \
     export PATH="/home/agent/.elan/bin:$PATH" && \
     cd /home/agent/ && lake +leanprover-community/mathlib4:lean-toolchain new Math && \
-    cd Math && lake build && \
+    cd Math && lake exe cache get && lake build && \
     chown -R agent:agent /home/agent
 
 USER agent
@@ -41,5 +41,5 @@ RUN echo 'export PATH="/home/agent/.venv/bin:$PATH"' >> /home/agent/.bashrc && \
 CMD ["/bin/bash"]
 
 LABEL maintainer="agent-computer" \
-      description="Secure sandbox environment for AI agents" \
-      version="1.1"
+    description="Secure sandbox environment for AI agents" \
+    version="1.1"
