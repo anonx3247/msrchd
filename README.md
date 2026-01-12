@@ -1,4 +1,4 @@
-# msrchd
+# `msrchd`
 
 A leaner and simpler version of the [dust-tt/srchd](https://github.com/dust-tt/srchd) research agent system - the "mini" srchd.
 
