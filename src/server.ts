@@ -305,7 +305,6 @@ export const createApp = () => {
     }
 
     const pubData = publication.toJSON();
-    const expData = experiment.toJSON();
 
     const content = getPublicationContent(reference);
     if (!content) {
@@ -313,7 +312,7 @@ export const createApp = () => {
     }
 
     // Get attachments
-    const attachmentsDir = getAttachmentPath(expData.id, reference);
+    const attachmentsDir = getAttachmentPath(reference);
     const attachments = fs.existsSync(attachmentsDir)
       ? fs.readdirSync(attachmentsDir)
       : [];
@@ -424,11 +423,7 @@ export const createApp = () => {
         return c.notFound();
       }
 
-      const localPath = getAttachmentPath(
-        experiment.toJSON().id,
-        reference,
-        attachment,
-      );
+      const localPath = getAttachmentPath(reference, attachment);
 
       if (!fs.existsSync(localPath)) {
         return c.notFound();
