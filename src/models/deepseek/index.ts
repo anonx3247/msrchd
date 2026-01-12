@@ -7,7 +7,6 @@ import {
   ModelConfig,
   Message,
   Tool,
-  ToolChoice,
   TokenUsage,
 } from "../index";
 import { PreTrainedTokenizer } from "@huggingface/transformers";
@@ -16,7 +15,6 @@ import OpenAI from "openai";
 import { Result, err, ok } from "@app/lib/error";
 import { assertNever } from "@app/lib/assert";
 import { removeNulls } from "@app/lib/utils";
-import { convertToolChoice } from "../openai";
 import { CompletionUsage } from "openai/resources/completions";
 
 export type DeepseekModel = "deepseek-chat" | "deepseek-reasoner";
@@ -129,11 +127,8 @@ export class DeepseekLLM extends LLM {
   async run(
     messages: Message[],
     prompt: string,
-    toolChoice: ToolChoice,
     tools: Tool[],
-  ): Promise<
-    Result<{ message: Message; tokenUsage?: TokenUsage }>
-  > {
+  ): Promise<Result<{ message: Message; tokenUsage?: TokenUsage }>> {
     try {
       const input = this.messages(prompt, messages);
 
@@ -141,7 +136,7 @@ export class DeepseekLLM extends LLM {
         {
           model: this.model,
           messages: input,
-          tool_choice: convertToolChoice(toolChoice),
+          tool_choice: "auto",
           tools: tools.map((tool) => ({
             type: "function",
             function: {
@@ -248,7 +243,6 @@ export class DeepseekLLM extends LLM {
   async tokens(
     messages: Message[],
     prompt: string,
-    toolChoice: ToolChoice,
     tools: Tool[],
   ): Promise<Result<number>> {
     const str = [messages, prompt, tools]

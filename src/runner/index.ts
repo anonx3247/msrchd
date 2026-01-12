@@ -366,12 +366,7 @@ This is an automated system message and there is no user available to respond. P
         messages = [agentLoopStartUserMessage, ...messages];
       }
 
-      const res = await this.model.tokens(
-        messages,
-        systemPrompt,
-        "auto",
-        tools,
-      );
+      const res = await this.model.tokens(messages, systemPrompt, tools);
       if (res.isErr()) {
         console.log("Agent: " + this.agentIndex);
         console.log(messages.length);
@@ -477,12 +472,7 @@ This is an automated system message and there is no user available to respond. P
     }
 
     const res = await withRetries(async () => {
-      return this.model.run(
-        messagesForModel.value,
-        systemPrompt,
-        "auto",
-        tools.value,
-      );
+      return this.model.run(messagesForModel.value, systemPrompt, tools.value);
     })({});
     if (res.isErr()) {
       return res;
@@ -546,49 +536,6 @@ This is an automated system message and there is no user available to respond. P
         }
       });
     }
-
-    return ok(undefined);
-  }
-
-  /**
-   * Replay a specific agent message tool uses
-   *
-   * @param messageId ID of the agent message to replay.
-   */
-  async replayAgentMessage(messageId: number): Promise<Result<void>> {
-    const agentMessage = await MessageResource.findById(
-      this.experiment,
-      this.agentIndex,
-      messageId,
-    );
-
-    if (!agentMessage || agentMessage.toJSON().role !== "agent") {
-      return err(
-        "not_found_error",
-        `Agent message not found for id ${messageId}`,
-      );
-    }
-
-    const content = agentMessage.toJSON().content;
-
-    content.forEach((c) => {
-      this.logContent(c, agentMessage.toJSON().id);
-    });
-
-    const toolResults = await concurrentExecutor(
-      content.filter((content) => content.type === "tool_use"),
-      async (t: ToolUse) => {
-        const res = await this.executeTool(t);
-        this.logContent(res);
-        if (res.isError) {
-          console.error(res.content);
-        }
-        return res;
-      },
-      { concurrency: 8 },
-    );
-
-    console.log(JSON.stringify(toolResults, null, 2));
 
     return ok(undefined);
   }

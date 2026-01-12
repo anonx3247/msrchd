@@ -3,7 +3,6 @@ import {
   ModelConfig,
   Message,
   Tool,
-  ToolChoice,
   TextContent,
   ToolUse,
   Thinking,
@@ -159,11 +158,8 @@ export class MistralLLM extends LLM {
   async run(
     messages: Message[],
     prompt: string,
-    toolChoice: ToolChoice,
     tools: Tool[],
-  ): Promise<
-    Result<{ message: Message; tokenUsage?: TokenUsage }>
-  > {
+  ): Promise<Result<{ message: Message; tokenUsage?: TokenUsage }>> {
     try {
       const chatResponse = await this.client.chat.complete({
         model: this.model,
@@ -174,7 +170,7 @@ export class MistralLLM extends LLM {
           },
           ...this.messages(messages),
         ],
-        toolChoice,
+        toolChoice: "auto",
         tools: tools.map((t) => ({
           type: "function",
           function: {
@@ -286,7 +282,6 @@ export class MistralLLM extends LLM {
   async tokens(
     messages: Message[],
     _prompt: string,
-    _toolChoice: ToolChoice,
     _tools: Tool[],
   ): Promise<Result<number>> {
     try {

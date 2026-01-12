@@ -2,20 +2,13 @@ import {
   ChatCompletionAssistantMessageParam,
   ChatCompletionMessageParam,
 } from "openai/resources/chat";
-import {
-  LLM,
-  ModelConfig,
-  Message,
-  Tool,
-  ToolChoice,
-  TokenUsage,
-} from "./index";
+import { LLM, ModelConfig, Message, Tool, TokenUsage } from "./index";
 
 import OpenAI from "openai";
 import { Result, err, ok } from "@app/lib/error";
 import { assertNever } from "@app/lib/assert";
 import { removeNulls } from "@app/lib/utils";
-import { convertThinking, convertToolChoice } from "./openai";
+import { convertThinking } from "./openai";
 import { CompletionUsage } from "openai/resources/completions";
 
 export type MoonshotAIModel = "kimi-k2-thinking";
@@ -127,18 +120,15 @@ export class MoonshotAILLM extends LLM {
   async run(
     messages: Message[],
     prompt: string,
-    toolChoice: ToolChoice,
     tools: Tool[],
-  ): Promise<
-    Result<{ message: Message; tokenUsage?: TokenUsage  }>
-  > {
+  ): Promise<Result<{ message: Message; tokenUsage?: TokenUsage }>> {
     try {
       const input = this.messages(prompt, messages);
 
       const response = await this.client.chat.completions.create({
         model: this.model,
         messages: input,
-        tool_choice: convertToolChoice(toolChoice),
+        tool_choice: "auto",
         reasoning_effort: convertThinking(this.config.thinking),
         tools: tools.map((tool) => ({
           type: "function",
@@ -236,7 +226,6 @@ export class MoonshotAILLM extends LLM {
   async tokens(
     messages: Message[],
     prompt: string,
-    toolChoice: ToolChoice,
     tools: Tool[],
   ): Promise<Result<number>> {
     try {
@@ -262,7 +251,7 @@ export class MoonshotAILLM extends LLM {
               },
               strict: false,
             })),
-            toolChoice: convertToolChoice(toolChoice),
+            toolChoice: "auto",
           }),
         },
       );

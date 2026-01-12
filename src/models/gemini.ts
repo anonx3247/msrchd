@@ -10,7 +10,6 @@ import {
   ModelConfig,
   Message,
   Tool,
-  ToolChoice,
   TextContent,
   ToolUse,
   TokenUsage,
@@ -127,11 +126,8 @@ export class GeminiLLM extends LLM {
   async run(
     messages: Message[],
     prompt: string,
-    toolChoice: ToolChoice,
     tools: Tool[],
-  ): Promise<
-    Result<{ message: Message; tokenUsage?: TokenUsage }>
-  > {
+  ): Promise<Result<{ message: Message; tokenUsage?: TokenUsage }>> {
     try {
       const response = await this.client.models.generateContent({
         model: this.model,
@@ -150,16 +146,7 @@ export class GeminiLLM extends LLM {
           },
           toolConfig: {
             functionCallingConfig: {
-              mode: (() => {
-                switch (toolChoice) {
-                  case "auto":
-                    return FunctionCallingConfigMode.AUTO;
-                  case "any":
-                    return FunctionCallingConfigMode.ANY;
-                  case "none":
-                    return FunctionCallingConfigMode.NONE;
-                }
-              })(),
+              mode: FunctionCallingConfigMode.AUTO,
             },
           },
           tools: [
@@ -278,7 +265,6 @@ export class GeminiLLM extends LLM {
   async tokens(
     messages: Message[],
     prompt: string,
-    _toolChoice: ToolChoice,
     _tools: Tool[],
   ): Promise<Result<number>> {
     try {

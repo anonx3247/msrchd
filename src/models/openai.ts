@@ -2,14 +2,7 @@ import {
   ResponseInputItem,
   ResponseUsage,
 } from "openai/resources/responses/responses";
-import {
-  LLM,
-  ModelConfig,
-  Message,
-  Tool,
-  ToolChoice,
-  TokenUsage,
-} from "./index";
+import { LLM, ModelConfig, Message, Tool, TokenUsage } from "./index";
 
 import OpenAI from "openai";
 import { Result, err, ok } from "@app/lib/error";
@@ -45,18 +38,6 @@ const TOKEN_PRICING: Record<OpenAIModel, OpenAITokenPrices> = {
   "gpt-5-nano": normalizeTokenPrices(0.05, 0.4),
   "gpt-4.1": normalizeTokenPrices(2, 8, 0.5),
 };
-
-export function convertToolChoice(toolChoice: ToolChoice) {
-  switch (toolChoice) {
-    case "none":
-    case "auto":
-      return toolChoice;
-    case "any":
-      return "required";
-    default:
-      assertNever(toolChoice);
-  }
-}
 
 export function convertThinking(thinking: boolean | undefined) {
   // true = enabled (use medium), false = disabled (use minimal), undefined = default (use medium)
@@ -193,11 +174,8 @@ export class OpenAILLM extends LLM {
   async run(
     messages: Message[],
     prompt: string,
-    toolChoice: ToolChoice,
     tools: Tool[],
-  ): Promise<
-    Result<{ message: Message; tokenUsage?: TokenUsage  }>
-  > {
+  ): Promise<Result<{ message: Message; tokenUsage?: TokenUsage }>> {
     try {
       const input = this.messages(messages);
 
@@ -205,7 +183,7 @@ export class OpenAILLM extends LLM {
         model: this.model,
         instructions: prompt,
         input,
-        tool_choice: convertToolChoice(toolChoice),
+        tool_choice: "auto",
         include:
           this.model === "gpt-4.1" ? [] : ["reasoning.encrypted_content"],
         reasoning:
@@ -319,7 +297,6 @@ export class OpenAILLM extends LLM {
   async tokens(
     messages: Message[],
     prompt: string,
-    toolChoice: ToolChoice,
     tools: Tool[],
   ): Promise<Result<number>> {
     try {
@@ -332,7 +309,7 @@ export class OpenAILLM extends LLM {
             instructions: prompt,
             model: this.model,
             input,
-            tool_choice: convertToolChoice(toolChoice),
+            tool_choice: "auto",
             reasoning:
               this.model === "gpt-4.1"
                 ? undefined
