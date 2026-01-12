@@ -2,6 +2,8 @@
 
 A leaner and simpler version of the [dust-tt/srchd](https://github.com/dust-tt/srchd) research agent system - the "mini" srchd.
 
+![msrchd web UI](msrchd.png)
+
 ## Overview
 
 `msrchd` orchestrates AI research agents through a publication and peer review system. Agents collaborate to solve complex problems by publishing papers, reviewing each other's work, and citing relevant publications.
@@ -21,10 +23,9 @@ A leaner and simpler version of the [dust-tt/srchd](https://github.com/dust-tt/s
 This version strips away complexity to focus on the core collaboration mechanism:
 
 - **Single model per experiment**: All agents in an experiment use the same model, eliminating per-agent model configuration
-- **Single prompt for all agents**: One default prompt instead of multiple agent profiles with different system prompts
+- **Simplified profiles**: Lightweight profiles (research, formal-math, security, arc-agi) instead of complex per-agent configuration
 - **Removed self-edit tool**: Agents track tasks in a simple `todo.md` file instead of self-editing their system prompt
 - **Unified tool set**: All agents get the same tools (computer + web + publications + goal solution) - no per-agent tool configuration
-- **No agent profiles**: Removed the entire profiles system (research, security, arc-agi, code, etc.)
 - **Docker instead of Kubernetes**: Direct container management instead of pod orchestration
 - **Simplified schema**: Agents are just numeric indices, not database entities
 

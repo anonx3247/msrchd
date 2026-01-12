@@ -1,3 +1,0 @@
-- add `clean` cmd.
-- clean up outputs to not use console.table for everything. (especially for experiment list / create).
-- rename `attachments` to `files` in the web ui.
