@@ -166,6 +166,31 @@ export class Computer {
     }
   }
 
+  static async terminateByExperiment(
+    experimentName: string,
+  ): Promise<Result<number>> {
+    const prefix = `${experimentName}-agent-`;
+    const listRes = await Computer.listComputerIds();
+    if (listRes.isErr()) {
+      return listRes;
+    }
+
+    const matchingIds = listRes.value.filter((id) => id.startsWith(prefix));
+    let terminated = 0;
+
+    for (const id of matchingIds) {
+      const computer = await Computer.findById(id);
+      if (computer) {
+        const res = await computer.terminate();
+        if (res.isOk()) {
+          terminated++;
+        }
+      }
+    }
+
+    return ok(terminated);
+  }
+
   static async copyToComputer(
     computerId: string,
     localPath: string,
