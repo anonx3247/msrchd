@@ -189,10 +189,7 @@ program
     if (hasComputer) {
       const experimentData = experiment.toJSON();
       console.log(`Building Docker image for ${experimentData.profile} profile...`);
-      const buildRes = await buildComputerImage(
-        null, // No SSH key for now
-        experimentData.profile,
-      );
+      const buildRes = await buildComputerImage(experimentData.profile);
       if (buildRes.isErr()) {
         return exitWithError(buildRes);
       }
