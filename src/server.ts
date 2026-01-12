@@ -57,11 +57,55 @@ const sanitizeMarkdown = (value: unknown): string => {
         "tr",
         "th",
         "td",
+        // KaTeX tags
+        "span",
+        "div",
+        "math",
+        "semantics",
+        "mrow",
+        "mi",
+        "mo",
+        "mn",
+        "msup",
+        "msub",
+        "mfrac",
+        "msubsup",
+        "mtext",
+        "mspace",
+        "msqrt",
+        "mroot",
+        "mover",
+        "munder",
+        "munderover",
+        "mtable",
+        "mtr",
+        "mtd",
+        "annotation",
+        "svg",
+        "line",
+        "path",
+        "g",
       ],
       allowedAttributes: {
         a: ["href"],
         code: ["class"],
         pre: ["class"],
+        // KaTeX attributes
+        span: ["class", "style", "aria-hidden"],
+        div: ["class", "style"],
+        math: ["xmlns"],
+        annotation: ["encoding"],
+        svg: [
+          "xmlns",
+          "width",
+          "height",
+          "viewBox",
+          "preserveAspectRatio",
+          "style",
+        ],
+        line: ["x1", "y1", "x2", "y2", "stroke-width"],
+        path: ["d"],
+        g: ["stroke", "fill", "stroke-width"],
       },
     });
   } catch (_err) {
@@ -89,11 +133,29 @@ const baseTemplate = (title: string, content: string): string => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${sanitizeText(title)} - msrchd</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      renderMathInElement(document.body, {
+        delimiters: [
+          {left: '$$', right: '$$', display: true},
+          {left: '$', right: '$', display: false},
+          {left: '\\\\[', right: '\\\\]', display: true},
+          {left: '\\\\(', right: '\\\\)', display: false}
+        ],
+        throwOnError: false
+      });
+    });
+  </script>
 </head>
 <body>
-  <div class="container">
-    ${content}
-  </div>
+  <nav>
+    <a href="/" class="nav-brand">msrchd</a>
+    <a href="/">Experiments</a>
+  </nav>
+  ${content}
 </body>
 </html>`;
 };
@@ -152,7 +214,9 @@ export const createApp = () => {
       }),
     );
 
-    const content = `
+    const content =
+      experimentsWithMetadata.length > 0
+        ? `
       <h1>Experiments</h1>
       ${experimentsWithMetadata
         .map(({ exp, cost, publicationsCount, votesCount, topVoted }) => {
@@ -174,6 +238,10 @@ export const createApp = () => {
         `;
         })
         .join("")}
+    `
+        : `
+      <h1>Experiments</h1>
+      <div class="empty-state">No experiments yet. Run <code>srchd run</code> to create one.</div>
     `;
 
     return c.html(baseTemplate("Experiments", content));
@@ -193,6 +261,13 @@ export const createApp = () => {
 
     const publications = await PublicationResource.listByExperiment(experiment);
     const solutions = await SolutionResource.listByExperiment(experiment);
+    const cost = await MessageResource.totalCostForExperiment(experiment);
+    const formattedCost =
+      cost < 0.01
+        ? `$${cost.toFixed(6)}`
+        : cost < 1
+          ? `$${cost.toFixed(4)}`
+          : `$${cost.toFixed(2)}`;
 
     // Count votes per publication
     const votesByPublication = solutions.reduce(
@@ -227,17 +302,19 @@ export const createApp = () => {
           `;
             })
             .join("")
-        : "<div class='detail-value'>No votes yet</div>";
+        : "<div class='empty-state'>No votes yet</div>";
 
-    const publicationsContent = publications
-      .sort(
-        (a, b) =>
-          b.toJSON().created.getTime() - a.toJSON().created.getTime(),
-      )
-      .map((pub) => {
-        const pubData = pub.toJSON();
-        const votes = votesByPublication[pubData.id] || 0;
-        return `
+    const publicationsContent =
+      publications.length > 0
+        ? publications
+            .sort(
+              (a, b) =>
+                b.toJSON().created.getTime() - a.toJSON().created.getTime(),
+            )
+            .map((pub) => {
+              const pubData = pub.toJSON();
+              const votes = votesByPublication[pubData.id] || 0;
+              return `
         <div class="list-item">
           <div class="list-item-title">
             <a href="/experiments/${sanitizeText(name)}/publications/${sanitizeText(pubData.reference)}">
@@ -245,27 +322,43 @@ export const createApp = () => {
             </a>
           </div>
           <div class="list-item-meta">
-            Status: <span class="${safeStatusClass(pubData.status)}">${sanitizeText(pubData.status)}</span> |
+            <span class="${safeStatusClass(pubData.status)}">${sanitizeText(pubData.status)}</span> |
             Author: <strong>Agent ${sanitizeText(pubData.author)}</strong> |
-            Reference: <strong>${sanitizeText(pubData.reference)}</strong> |
-            Votes: <strong>${votes}</strong> |
-            Created: ${sanitizeText(pubData.created.toLocaleString())}
+            Ref: <strong>${sanitizeText(pubData.reference)}</strong> |
+            Votes: <strong>${votes}</strong>
           </div>
         </div>
       `;
-      })
-      .join("");
+            })
+            .join("")
+        : "<div class='empty-state'>No publications yet</div>";
 
     const content = `
-      <a href="/" class="back-link">← Back to Experiments</a>
+      <a href="/" class="back-link">&larr; Back to Experiments</a>
       <h1>${sanitizeText(expData.name)}</h1>
+
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value">${sanitizeText(expData.agent_count)}</div>
+          <div class="stat-label">Agents</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${publications.length}</div>
+          <div class="stat-label">Publications</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${solutions.length}</div>
+          <div class="stat-label">Votes</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${sanitizeText(formattedCost)}</div>
+          <div class="stat-label">Total Cost</div>
+        </div>
+      </div>
 
       <div class="detail-section">
         <div class="detail-label">Model</div>
         <div class="detail-value">${sanitizeText(expData.model)}</div>
-
-        <div class="detail-label">Agents</div>
-        <div class="detail-value">${sanitizeText(expData.agent_count)}</div>
 
         <div class="detail-label">Problem</div>
         <div class="detail-value markdown-content">${sanitizeMarkdown(expData.problem)}</div>
@@ -276,7 +369,7 @@ export const createApp = () => {
         ${votesContent}
       </div>
 
-      <h2>Publications (${publications.length})</h2>
+      <h2>Publications</h2>
       ${publicationsContent}
     `;
 
@@ -333,7 +426,7 @@ export const createApp = () => {
               (att) => `
             <div class="attachment-item">
               <a href="/experiments/${sanitizeText(experimentName)}/publications/${sanitizeText(reference)}/attachments/${sanitizeText(att)}">
-                📎 ${sanitizeText(att)}
+                ${sanitizeText(att)}
               </a>
             </div>
           `,
@@ -344,48 +437,38 @@ export const createApp = () => {
         : "";
 
     const reviewsContent =
-      pubData.status === "PUBLISHED" && pubData.reviews.length > 0
+      pubData.reviews.length > 0
         ? `
       <h2>Reviews</h2>
-      <div class="detail-section">
-        ${pubData.reviews
-          .map(
-            (review) => `
-          <div class="detail-label">Agent ${sanitizeText(review.author)} - ${sanitizeText(review.grade ?? "PENDING")}</div>
+      ${pubData.reviews
+        .map(
+          (review) => `
+        <div class="detail-section">
+          <div class="detail-label">Agent ${sanitizeText(review.author)}</div>
+          <div class="detail-value">
+            <span class="${review.grade === "ACCEPT" ? "status-published" : review.grade === "REJECT" ? "status-rejected" : "status-submitted"}">${sanitizeText(review.grade ?? "PENDING")}</span>
+          </div>
+          <div class="detail-label">Review</div>
           <div class="detail-value markdown-content">${sanitizeMarkdown(review.content ?? "No content")}</div>
-        `,
-          )
-          .join("<hr style='border-color: #333; margin: 15px 0;'>")}
-      </div>
+        </div>
+      `,
+        )
+        .join("")}
     `
         : "";
 
     const pageContent = `
-      <a href="/experiments/${sanitizeText(experimentName)}" class="back-link">← Back to ${sanitizeText(experimentName)}</a>
+      <a href="/experiments/${sanitizeText(experimentName)}" class="back-link">&larr; Back to ${sanitizeText(experimentName)}</a>
       <h1>${sanitizeText(pubData.title)}</h1>
-
-      <div class="detail-section">
-        <div class="detail-label">Reference</div>
-        <div class="detail-value">${sanitizeText(pubData.reference)}</div>
-
-        <div class="detail-label">Author</div>
-        <div class="detail-value">Agent ${sanitizeText(pubData.author)}</div>
-
-        <div class="detail-label">Status</div>
-        <div class="detail-value">
-          <span class="${safeStatusClass(pubData.status)}">${sanitizeText(pubData.status)}</span>
-        </div>
-
-        <div class="detail-label">Votes</div>
-        <div class="detail-value">${votes}</div>
-
-        <div class="detail-label">Created</div>
-        <div class="detail-value">${sanitizeText(pubData.created.toLocaleString())}</div>
-
-        ${attachmentsContent}
+      <div class="pub-meta">
+        <span class="${safeStatusClass(pubData.status)}">${sanitizeText(pubData.status)}</span>
+        <span>Agent ${sanitizeText(pubData.author)}</span>
+        <span>${sanitizeText(pubData.reference)}</span>
+        <span>${votes} vote${votes !== 1 ? "s" : ""}</span>
+        <span>${sanitizeText(pubData.created.toLocaleString())}</span>
       </div>
+      ${attachmentsContent ? `<div class="detail-section">${attachmentsContent}</div>` : ""}
 
-      <h2>Content</h2>
       <div class="detail-section">
         <div class="markdown-content">${sanitizeMarkdown(content)}</div>
       </div>
