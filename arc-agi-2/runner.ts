@@ -6,9 +6,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import { db } from '@app/db/index';
-import { experiments, agents, solutions, publications, messages, evolutions, reviews, citations, token_usages } from '@app/db/schema';
-import { eq, and, desc, sql } from 'drizzle-orm';
-import { verifyOutputs } from '../../../problems/ARC-AGI-2/verify';
+import { experiments, solutions, publications, messages, reviews, citations } from '@app/db/schema';
+import { eq, desc, sum } from 'drizzle-orm';
+import { verifyOutputs } from '../problems/ARC-AGI-2/verify';
 
 // Types
 interface ExperimentRecord {
@@ -61,7 +61,7 @@ function saveStatus(status: StatusFile): void {
 function executeCommand(command: string, retryCount: number = 0): void {
   try {
     console.log(`\n[CMD] ${command}`);
-    execSync(command, { stdio: 'inherit', cwd: path.join(__dirname, '../../..') });
+    execSync(command, { stdio: 'inherit', cwd: path.join(__dirname, '..') });
   } catch (error) {
     if (retryCount < MAX_RETRIES) {
       console.error(`\n[ERROR] Command failed (attempt ${retryCount + 1}/${MAX_RETRIES})`);
@@ -140,23 +140,15 @@ function experimentExists(experimentName: string): boolean {
   return !!result;
 }
 
-// Count agents in experiment
-function countAgents(experimentName: string): number {
+// Get agent count from experiment
+function getAgentCount(experimentName: string): number {
   const experiment = db
     .select()
     .from(experiments)
     .where(eq(experiments.name, experimentName))
     .get();
 
-  if (!experiment) return 0;
-
-  const agentList = db
-    .select()
-    .from(agents)
-    .where(eq(agents.experiment, experiment.id))
-    .all();
-
-  return agentList.length;
+  return experiment?.agent_count ?? 0;
 }
 
 // List all experiments
@@ -165,7 +157,7 @@ function listExperiments(): void {
   const problems = loadProblems();
 
   if (status.experiments.length === 0) {
-    console.log('\n📊 No experiments have been run yet.\n');
+    console.log('\nNo experiments have been run yet.\n');
     return;
   }
 
@@ -178,12 +170,12 @@ function listExperiments(): void {
     byProblem.get(exp.problemId)!.push(exp);
   }
 
-  console.log('\n=== 📊 ARC-AGI Experiment Status ===\n');
+  console.log('\n=== ARC-AGI Experiment Status ===\n');
 
   for (const [problemId, experiments] of byProblem.entries()) {
     const problemIndex = problems.indexOf(problemId) + 1;
     console.log(`\nProblem #${problemIndex}: ${problemId}`);
-    console.log('─'.repeat(100));
+    console.log('-'.repeat(100));
 
     // Sort by agents, then budget
     experiments.sort((a, b) => {
@@ -193,11 +185,11 @@ function listExperiments(): void {
 
     // Prepare table data
     const tableData = experiments.map((exp) => {
-      const statusEmoji = {
-        completed: '✅',
-        in_progress: '🔄',
-        failed: '❌',
-        not_started: '⏸️',
+      const statusIcon = {
+        completed: '[OK]',
+        in_progress: '[..]',
+        failed: '[!!]',
+        not_started: '[--]',
       }[exp.status];
 
       const lastRun = exp.lastRun
@@ -213,7 +205,7 @@ function listExperiments(): void {
         Budget: `$${exp.budget}`,
         Model: exp.model,
         Variant: exp.variant || '-',
-        Status: `${statusEmoji} ${exp.status}`,
+        Status: `${statusIcon} ${exp.status}`,
         Retries: exp.retryCount,
         'Last Run': lastRun,
         'Completed': completedAt,
@@ -232,7 +224,7 @@ function listExperiments(): void {
 
   console.log('='.repeat(100));
   console.log(
-    `📈 Summary: ${completed} completed, ${inProgress} in progress, ${failed} failed (${total} total)`
+    `Summary: ${completed} completed, ${inProgress} in progress, ${failed} failed (${total} total)`
   );
   console.log('='.repeat(100) + '\n');
 }
@@ -245,11 +237,12 @@ async function runExperiment(
   model: string,
   variant: string | null
 ): Promise<void> {
+  const profile = 'arc-agi';
   const problems = loadProblems();
 
   // Validate index
   if (index < 1 || index > problems.length) {
-    console.error(`\n❌ Invalid index: ${index}. Must be between 1 and ${problems.length}`);
+    console.error(`\n[ERROR] Invalid index: ${index}. Must be between 1 and ${problems.length}`);
     process.exit(1);
   }
 
@@ -257,13 +250,13 @@ async function runExperiment(
   const baseExperimentName = `arc-agi-${problemId}-${numAgents}agents`;
   const experimentName = variant ? `${baseExperimentName}-${variant}` : baseExperimentName;
   const problemPath = `problems/ARC-AGI-2/generated/${problemId}/problem`;
-  const problemJsonPath = `problems/ARC-AGI-2/generated/${problemId}/problem.json`;
 
-  console.log(`\n🚀 Starting experiment:`);
+  console.log(`\nStarting experiment:`);
   console.log(`   Problem: #${index} (${problemId})`);
   console.log(`   Experiment: ${experimentName}`);
   console.log(`   Agents: ${numAgents}`);
   console.log(`   Model: ${model}`);
+  console.log(`   Profile: ${profile}`);
   console.log(`   Budget: $${budget}`);
   if (variant) {
     console.log(`   Variant: ${variant}`);
@@ -275,7 +268,7 @@ async function runExperiment(
 
   // Check if already completed
   if (record && record.status === 'completed') {
-    console.log(`\n⚠️  This experiment has already been completed.`);
+    console.log(`\n[WARN] This experiment has already been completed.`);
     const shouldContinue = await askConfirmation('Do you want to run it again?');
     if (!shouldContinue) {
       console.log('Aborted.');
@@ -309,36 +302,25 @@ async function runExperiment(
   saveStatus(status);
 
   try {
-    // Step 1: Create experiment (if it doesn't exist)
-    console.log('\n📝 Step 1: Checking/creating experiment...');
+    // Step 1: Create experiment with agents (if it doesn't exist)
+    console.log('\n[1/2] Checking/creating experiment...');
     if (!experimentExists(experimentName)) {
       console.log(`   Creating experiment: ${experimentName}`);
       executeCommand(
-        `npx tsx src/srchd.ts experiment create ${experimentName} -p ${problemPath}`
+        `npx tsx src/srchd.ts create ${experimentName} -p ${problemPath} -m ${model} -n ${numAgents} --profile ${profile}`
       );
     } else {
-      console.log(`   ✓ Experiment already exists: ${experimentName}`);
+      const existingAgents = getAgentCount(experimentName);
+      console.log(`   Experiment already exists: ${experimentName} (${existingAgents} agents)`);
+      if (existingAgents !== numAgents) {
+        console.error(`   [WARN] Agent count mismatch: expected ${numAgents}, got ${existingAgents}`);
+      }
     }
 
-    // Step 2: Create agents (if they don't exist)
-    console.log(`\n🤖 Step 2: Checking/creating ${numAgents} agents...`);
-    const existingAgents = countAgents(experimentName);
-
-    if (existingAgents < numAgents) {
-      const agentsToCreate = numAgents - existingAgents;
-      console.log(`   Creating ${agentsToCreate} more agents (${existingAgents} already exist)...`);
-      executeCommand(
-        `npx tsx src/srchd.ts agent create -e ${experimentName} -n agent -c ${agentsToCreate} -m ${model} -t high -p arc-agi`
-      );
-    } else {
-      console.log(`   ✓ All ${numAgents} agents already exist`);
-    }
-
-    // Step 3: Run all agents
-    console.log(`\n▶️  Step 3: Running all agents with budget $${budget}...`);
-    const reviewers = numAgents < 5 ? numAgents - 1 : 4;
+    // Step 2: Run all agents
+    console.log(`\n[2/2] Running all agents with budget $${budget}...`);
     executeCommand(
-      `npx tsx src/srchd.ts agent run all -e ${experimentName} -p ${problemJsonPath} --max-cost ${budget} -r ${reviewers}`
+      `npx tsx src/srchd.ts run ${experimentName} --max-cost ${budget}`
     );
 
     // Success!
@@ -347,7 +329,7 @@ async function runExperiment(
     record.lastError = null;
     saveStatus(status);
 
-    console.log(`\n✅ Experiment completed successfully!`);
+    console.log(`\n[OK] Experiment completed successfully!`);
   } catch (error) {
     // Handle failure
     record.retryCount += 1;
@@ -355,9 +337,9 @@ async function runExperiment(
 
     if (record.retryCount >= MAX_RETRIES) {
       record.status = 'failed';
-      console.error(`\n❌ Experiment failed after ${MAX_RETRIES} attempts.`);
+      console.error(`\n[ERROR] Experiment failed after ${MAX_RETRIES} attempts.`);
     } else {
-      console.error(`\n⚠️  Attempt ${record.retryCount} failed. Can retry later.`);
+      console.error(`\n[WARN] Attempt ${record.retryCount} failed. Can retry later.`);
     }
 
     saveStatus(status);
@@ -369,14 +351,13 @@ async function runExperiment(
 async function verifyExperiment(
   index: number,
   numAgents: number,
-  budget: number,
   variant: string | null
 ): Promise<void> {
   const problems = loadProblems();
 
   // Validate index
   if (index < 1 || index > problems.length) {
-    console.error(`\n❌ Invalid index: ${index}. Must be between 1 and ${problems.length}`);
+    console.error(`\n[ERROR] Invalid index: ${index}. Must be between 1 and ${problems.length}`);
     process.exit(1);
   }
 
@@ -384,7 +365,7 @@ async function verifyExperiment(
   const baseExperimentName = `arc-agi-${problemId}-${numAgents}agents`;
   const experimentName = variant ? `${baseExperimentName}-${variant}` : baseExperimentName;
 
-  console.log(`\n🔍 Verifying experiment solution:`);
+  console.log(`\nVerifying experiment solution:`);
   console.log(`   Problem: #${index} (${problemId})`);
   console.log(`   Experiment: ${experimentName}\n`);
 
@@ -396,14 +377,14 @@ async function verifyExperiment(
     .get();
 
   if (!experiment) {
-    console.error(`❌ Error: Experiment '${experimentName}' not found`);
+    console.error(`[ERROR] Experiment '${experimentName}' not found`);
     process.exit(1);
   }
 
   const expId = experiment.id;
 
   // Gather metrics
-  console.log('📊 Gathering experiment metrics...\n');
+  console.log('Gathering experiment metrics...\n');
 
   // Count publications
   const allPublications = db
@@ -423,23 +404,25 @@ async function verifyExperiment(
 
   const uniqueSolutions = new Set(allSolutions.map(s => s.publication).filter(p => p !== null)).size;
 
-  // Calculate total tokens (in millions)
+  // Calculate total tokens and cost from messages
   const tokenStats = db
-    .select()
-    .from(token_usages)
-    .where(eq(token_usages.experiment, expId))
-    .all();
+    .select({
+      totalTokens: sum(messages.total_tokens),
+      totalCost: sum(messages.cost)
+    })
+    .from(messages)
+    .where(eq(messages.experiment, expId))
+    .get();
 
-  const totalTokens = tokenStats.reduce((sum, t) => sum + t.total, 0);
+  const totalTokens = Number(tokenStats?.totalTokens ?? 0);
+  const totalCost = Number(tokenStats?.totalCost ?? 0);
   const mtokens = (totalTokens / 1_000_000).toFixed(2);
-
-
 
   // Get most voted solution (most recent by any agent)
   const solutionsList = allSolutions;
 
   if (solutionsList.length === 0) {
-    console.error(`❌ Error: No solutions found for experiment '${experimentName}'`);
+    console.error(`[ERROR] No solutions found for experiment '${experimentName}'`);
     process.exit(1);
   }
 
@@ -452,7 +435,7 @@ async function verifyExperiment(
   }
 
   if (voteCounts.size === 0) {
-    console.error(`❌ Error: No publications referenced in solutions`);
+    console.error(`[ERROR] No publications referenced in solutions`);
     process.exit(1);
   }
 
@@ -460,7 +443,7 @@ async function verifyExperiment(
   const mostVotedPubId = Array.from(voteCounts.entries())
     .sort((a, b) => b[1] - a[1])[0][0];
 
-  console.log(`📊 Most voted solution has ${voteCounts.get(mostVotedPubId)} vote(s)\n`);
+  console.log(`Most voted solution has ${voteCounts.get(mostVotedPubId)} vote(s)\n`);
 
   // Get the publication
   const publication = db
@@ -470,24 +453,23 @@ async function verifyExperiment(
     .get();
 
   if (!publication) {
-    console.error(`❌ Error: Publication not found`);
+    console.error(`[ERROR] Publication not found`);
     process.exit(1);
   }
 
   const reference = publication.reference;
-  console.log(`📄 Publication reference: ${reference}`);
+  console.log(`Publication reference: ${reference}`);
 
-  // Check for attachments
+  // Check for attachments (new path: publications/${reference})
   const attachmentsDir = path.join(
     __dirname,
-    '../../..',
-    'attachments',
-    `${experiment.id}`,
+    '..',
+    'publications',
     reference
   );
 
   if (!fs.existsSync(attachmentsDir)) {
-    console.error(`❌ Error: No attachments found for publication '${reference}'`);
+    console.error(`[ERROR] No attachments found for publication '${reference}'`);
     console.error(`   Expected path: ${attachmentsDir}`);
     process.exit(1);
   }
@@ -496,7 +478,7 @@ async function verifyExperiment(
   const jsonFiles = files.filter(f => f.endsWith('.json'));
 
   if (jsonFiles.length === 0) {
-    console.error(`❌ Error: No JSON files found in attachments`);
+    console.error(`[ERROR] No JSON files found in attachments`);
     console.error(`   Available files: ${files.join(', ')}`);
     process.exit(1);
   }
@@ -505,26 +487,26 @@ async function verifyExperiment(
   let selectedFile: string;
   if (jsonFiles.includes('outputs.json')) {
     selectedFile = 'outputs.json';
-    console.log(`✓ Using outputs.json\n`);
+    console.log(`Using outputs.json\n`);
   } else if (jsonFiles.length === 1) {
     selectedFile = jsonFiles[0];
-    console.log(`✓ Using ${selectedFile}\n`);
+    console.log(`Using ${selectedFile}\n`);
   } else {
-    console.log(`📎 Found ${jsonFiles.length} JSON file(s): ${jsonFiles.join(', ')}\n`);
+    console.log(`Found ${jsonFiles.length} JSON file(s): ${jsonFiles.join(', ')}\n`);
     const selection = await askSelection('Multiple JSON files found. Select one:', jsonFiles);
     selectedFile = jsonFiles[selection];
-    console.log(`✓ Selected ${selectedFile}\n`);
+    console.log(`Selected ${selectedFile}\n`);
   }
 
   const outputsPath = path.join(attachmentsDir, selectedFile);
 
-  console.log(`🧪 Running verification...\n`);
+  console.log(`Running verification...\n`);
 
   // Use verify library
   const verifyResult = await verifyOutputs(
     problemId,
     outputsPath,
-    path.join(__dirname, '../../../problems/ARC-AGI-2')
+    path.join(__dirname, '../problems/ARC-AGI-2')
   );
 
   // Display metrics table with verification results
@@ -532,7 +514,8 @@ async function verifyExperiment(
     'Publications': allPublications.length,
     'Published': publishedCount,
     'Unique Solutions': uniqueSolutions,
-    'MTok Consumed': mtokens,
+    'MTok': mtokens,
+    'Cost': `$${totalCost.toFixed(2)}`,
     'Perf': verifyResult.error ? 'ERROR' : `${verifyResult.percentage}%`,
     'Cases': verifyResult.error ? '-' : `${verifyResult.passed}/${verifyResult.total}`,
   }];
@@ -541,14 +524,14 @@ async function verifyExperiment(
   console.log('');
 
   if (verifyResult.error) {
-    console.error(`❌ Verification error: ${verifyResult.error}`);
+    console.error(`[ERROR] Verification error: ${verifyResult.error}`);
     process.exit(1);
   }
 
   if (verifyResult.success) {
-    console.log(`✅ All ${verifyResult.total} test case(s) passed!`);
+    console.log(`[OK] All ${verifyResult.total} test case(s) passed!`);
   } else {
-    console.log(`⚠️  Passed ${verifyResult.passed}/${verifyResult.total} test case(s) (${verifyResult.percentage}%)`);
+    console.log(`[WARN] Passed ${verifyResult.passed}/${verifyResult.total} test case(s) (${verifyResult.percentage}%)`);
   }
 }
 
@@ -556,7 +539,6 @@ async function verifyExperiment(
 async function cleanExperiment(
   index: number,
   numAgents: number,
-  budget: number,
   variant: string | null,
   deleteData: boolean
 ): Promise<void> {
@@ -564,7 +546,7 @@ async function cleanExperiment(
 
   // Validate index
   if (index < 1 || index > problems.length) {
-    console.error(`\n❌ Invalid index: ${index}. Must be between 1 and ${problems.length}`);
+    console.error(`\n[ERROR] Invalid index: ${index}. Must be between 1 and ${problems.length}`);
     process.exit(1);
   }
 
@@ -572,20 +554,20 @@ async function cleanExperiment(
   const baseExperimentName = `arc-agi-${problemId}-${numAgents}agents`;
   const experimentName = variant ? `${baseExperimentName}-${variant}` : baseExperimentName;
 
-  console.log(`\n🧹 Cleaning experiment resources:`);
+  console.log(`\nCleaning experiment resources:`);
   console.log(`   Problem: #${index} (${problemId})`);
   console.log(`   Experiment: ${experimentName}\n`);
 
   // Step 1: Delete Kubernetes pods
   const podPattern = `srchd-default-${experimentName}-`;
 
-  console.log(`📦 Looking for pods matching: ${podPattern}*`);
+  console.log(`Looking for pods matching: ${podPattern}*`);
 
   try {
     // Get matching pods
     const listResult = execSync('kubectl get pods -o name', {
       encoding: 'utf-8',
-      cwd: path.join(__dirname, '../../..')
+      cwd: path.join(__dirname, '..')
     });
 
     const allPods = listResult.split('\n').filter(line => line.trim());
@@ -608,23 +590,23 @@ async function cleanExperiment(
 
         // Run deletion in background (detached)
         spawn('sh', ['-c', `kubectl get pods -o name | grep -E '${grepPattern}' | xargs kubectl delete`], {
-          cwd: path.join(__dirname, '../../..'),
+          cwd: path.join(__dirname, '..'),
           detached: true,
           stdio: 'ignore'
         }).unref();
 
-        console.log('   ✅ Pod deletion started in background\n');
+        console.log('   [OK] Pod deletion started in background\n');
       } else {
         console.log('   Skipped pod deletion\n');
       }
     }
   } catch (error) {
-    console.error('   ⚠️  Failed to list/delete pods:', error instanceof Error ? error.message : String(error));
+    console.error('   [WARN] Failed to list/delete pods:', error instanceof Error ? error.message : String(error));
   }
 
   // Step 2: Delete database data if requested
   if (deleteData) {
-    console.log('🗑️  Deleting database data...');
+    console.log('Deleting database data...');
 
     // Find experiment
     const experiment = db
@@ -646,14 +628,8 @@ async function cleanExperiment(
     if (shouldDeleteData) {
       try {
         // Delete in order respecting foreign key constraints
-        console.log('   Deleting token_usages...');
-        db.delete(token_usages).where(eq(token_usages.experiment, expId)).run();
-
         console.log('   Deleting messages...');
         db.delete(messages).where(eq(messages.experiment, expId)).run();
-
-        console.log('   Deleting evolutions...');
-        db.delete(evolutions).where(eq(evolutions.experiment, expId)).run();
 
         console.log('   Deleting reviews...');
         db.delete(reviews).where(eq(reviews.experiment, expId)).run();
@@ -667,15 +643,12 @@ async function cleanExperiment(
         console.log('   Deleting publications...');
         db.delete(publications).where(eq(publications.experiment, expId)).run();
 
-        console.log('   Deleting agents...');
-        db.delete(agents).where(eq(agents.experiment, expId)).run();
-
         console.log('   Deleting experiment...');
         db.delete(experiments).where(eq(experiments.id, expId)).run();
 
-        console.log('   ✅ Database data deleted\n');
+        console.log('   [OK] Database data deleted\n');
       } catch (error) {
-        console.error('   ❌ Error deleting data:', error instanceof Error ? error.message : String(error));
+        console.error('   [ERROR] Error deleting data:', error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     } else {
@@ -683,7 +656,7 @@ async function cleanExperiment(
     }
   }
 
-  console.log('✅ Cleanup complete!\n');
+  console.log('[OK] Cleanup complete!\n');
 }
 
 // Main
@@ -724,7 +697,7 @@ async function main() {
     .option('-v, --variant <variant>', 'Experiment variant name (appended to experiment name)')
     .action(async (index, options) => {
       if (!options.agents || !options.budget) {
-        console.error('\n❌ Error: Both --agents and --budget options are required');
+        console.error('\n[ERROR] Both --agents and --budget options are required');
         console.error('Usage: npx tsx runner.ts run <index> -a <agents> -b <budget> [-m <model>] [-v <variant>]');
         console.error('Example: npx tsx runner.ts run 1 -a 5 -b 50 -m deepseek-reasoner -v test1\n');
         process.exit(1);
@@ -752,24 +725,18 @@ async function main() {
       if (isNaN(num)) throw new Error('Agents must be a number');
       return num;
     })
-    .option('-b, --budget <number>', 'Total cost budget', (val) => {
-      const num = parseFloat(val);
-      if (isNaN(num)) throw new Error('Budget must be a number');
-      return num;
-    })
     .option('-v, --variant <variant>', 'Experiment variant name')
     .action(async (index, options) => {
-      if (!options.agents || !options.budget) {
-        console.error('\n❌ Error: Both --agents and --budget options are required');
-        console.error('Usage: npx tsx runner.ts verify <index> -a <agents> -b <budget> [-v <variant>]');
-        console.error('Example: npx tsx runner.ts verify 1 -a 5 -b 50 -v test1\n');
+      if (!options.agents) {
+        console.error('\n[ERROR] The --agents option is required');
+        console.error('Usage: npx tsx runner.ts verify <index> -a <agents> [-v <variant>]');
+        console.error('Example: npx tsx runner.ts verify 1 -a 5 -v test1\n');
         process.exit(1);
       }
 
       await verifyExperiment(
         index,
         options.agents,
-        options.budget,
         options.variant || null
       );
     });
@@ -787,25 +754,19 @@ async function main() {
       if (isNaN(num)) throw new Error('Agents must be a number');
       return num;
     })
-    .option('-b, --budget <number>', 'Total cost budget', (val) => {
-      const num = parseFloat(val);
-      if (isNaN(num)) throw new Error('Budget must be a number');
-      return num;
-    })
     .option('-v, --variant <variant>', 'Experiment variant name')
     .option('--data', 'Also delete all database data for the experiment')
     .action(async (index, options) => {
-      if (!options.agents || !options.budget) {
-        console.error('\n❌ Error: Both --agents and --budget options are required');
-        console.error('Usage: npx tsx runner.ts clean <index> -a <agents> -b <budget> [-v <variant>] [--data]');
-        console.error('Example: npx tsx runner.ts clean 1 -a 5 -b 50 -v test1 --data\n');
+      if (!options.agents) {
+        console.error('\n[ERROR] The --agents option is required');
+        console.error('Usage: npx tsx runner.ts clean <index> -a <agents> [-v <variant>] [--data]');
+        console.error('Example: npx tsx runner.ts clean 1 -a 5 -v test1 --data\n');
         process.exit(1);
       }
 
       await cleanExperiment(
         index,
         options.agents,
-        options.budget,
         options.variant || null,
         options.data || false
       );
@@ -815,6 +776,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error('\n❌ Fatal error:', error.message);
+  console.error('\n[FATAL] Fatal error:', error.message);
   process.exit(1);
 });
