@@ -91,6 +91,9 @@ export function err(
   cause?: any,
 ): Err<SrchdError> {
   const errorCause = cause instanceof Error ? cause : null;
+  if (errorCause) {
+    console.error(errorCause);
+  }
   return new Err(new SrchdError(code, message, errorCause));
 }
 

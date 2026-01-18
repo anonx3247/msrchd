@@ -30,6 +30,7 @@ function normalizeTokenPrices(
 
 // https://platform.openai.com/docs/pricing
 const TOKEN_PRICING: Record<OpenAIModel, OpenAITokenPrices> = {
+  "gpt-5.2-pro": normalizeTokenPrices(21, 168),
   "gpt-5.2": normalizeTokenPrices(1.75, 14),
   "gpt-5": normalizeTokenPrices(1.25, 10),
   "gpt-5-codex": normalizeTokenPrices(1.25, 10),
@@ -49,6 +50,7 @@ export function convertThinking(thinking: boolean | undefined) {
 }
 
 export type OpenAIModel =
+  | "gpt-5.2-pro"
   | "gpt-5.2"
   | "gpt-5.1"
   | "gpt-5.1-codex"
@@ -59,6 +61,7 @@ export type OpenAIModel =
   | "gpt-4.1";
 export function isOpenAIModel(model: string): model is OpenAIModel {
   return [
+  | "gpt-5.2-pro"
     "gpt-5.2",
     "gpt-5.1",
     "gpt-5.1-codex",
@@ -344,6 +347,7 @@ export class OpenAILLM extends LLM {
       case "gpt-5-codex":
       case "gpt-5.1-codex":
       case "gpt-5.2":
+      case "gpt-5.2-pro":
         return 400000 - 128000;
       case "gpt-4.1":
         return 1047576 - 32768;
