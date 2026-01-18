@@ -16,11 +16,29 @@ RUN groupadd -g 1001 agent && \
     useradd -u 1001 -g 1001 -m -s /bin/bash agent && \
     echo 'agent ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-RUN export HOME=/home/agent; curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y && \
+# Install Lean, Mathlib, REPL, and Loogle
+RUN export HOME=/home/agent && \
+    curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y && \
     echo 'export PATH="/home/agent/.elan/bin:$PATH"' >> /home/agent/.bashrc && \
     export PATH="/home/agent/.elan/bin:$PATH" && \
-    cd /home/agent/ && lake +leanprover-community/mathlib4:lean-toolchain new Math math && \
+    # Create Math project with mathlib
+    cd /home/agent/ && \
+    lake +leanprover-community/mathlib4:lean-toolchain new Math math && \
     cd Math && lake exe cache get && lake build && \
+    # Install Lean REPL (use Math project's toolchain for compatibility)
+    cd /home/agent && \
+    git clone https://github.com/leanprover-community/repl.git && \
+    cd repl && \
+    cp /home/agent/Math/lean-toolchain . && \
+    lake build && \
+    # Install Loogle (use Math project's toolchain for compatibility)
+    cd /home/agent && \
+    git clone https://github.com/nomeata/loogle.git && \
+    cd loogle && \
+    cp /home/agent/Math/lean-toolchain . && \
+    lake exe cache get && \
+    lake build LoogleMathlibCache && \
+    # Fix ownership for all installed tools
     chown -R agent:agent /home/agent
 
 USER agent
