@@ -37,7 +37,7 @@ RUN export HOME=/home/agent && \
     cd loogle && \
     cp /home/agent/Math/lean-toolchain . && \
     lake exe cache get && \
-    lake build LoogleMathlibCache && \
+    lake build loogle && \
     # Fix ownership for all installed tools
     chown -R agent:agent /home/agent
 

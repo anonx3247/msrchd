@@ -61,7 +61,7 @@ export type OpenAIModel =
   | "gpt-4.1";
 export function isOpenAIModel(model: string): model is OpenAIModel {
   return [
-  | "gpt-5.2-pro"
+    "gpt-5.2-pro",
     "gpt-5.2",
     "gpt-5.1",
     "gpt-5.1-codex",
