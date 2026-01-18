@@ -16,7 +16,7 @@ RUN groupadd -g 1001 agent && \
     useradd -u 1001 -g 1001 -m -s /bin/bash agent && \
     echo 'agent ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-# Install Lean, Mathlib, REPL, and Loogle
+# Install Lean, Mathlib, and REPL
 RUN export HOME=/home/agent && \
     curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y && \
     echo 'export PATH="/home/agent/.elan/bin:$PATH"' >> /home/agent/.bashrc && \
@@ -31,13 +31,6 @@ RUN export HOME=/home/agent && \
     cd repl && \
     cp /home/agent/Math/lean-toolchain . && \
     lake build && \
-    # Install Loogle (use Math project's toolchain for compatibility)
-    cd /home/agent && \
-    git clone https://github.com/nomeata/loogle.git && \
-    cd loogle && \
-    cp /home/agent/Math/lean-toolchain . && \
-    lake exe cache get && \
-    lake build loogle && \
     # Fix ownership for all installed tools
     chown -R agent:agent /home/agent
 
