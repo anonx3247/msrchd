@@ -31,27 +31,33 @@ RUN groupadd -g 1001 agent && \
     # Give agent sudo access (for permissive mode)
     echo 'agent ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
+# Create Python venv in a template location (will be copied to home on first run)
+RUN python3 -m venv /etc/skel-agent-venv && \
+    /etc/skel-agent-venv/bin/pip install --upgrade pip && \
+    /etc/skel-agent-venv/bin/pip install \
+    numpy pandas matplotlib seaborn plotly
+
+# Create home directory template with dotfiles
+RUN mkdir -p /etc/skel-agent && \
+    echo 'export PATH="/home/agent/.venv/bin:$PATH"' >> /etc/skel-agent/.bashrc && \
+    echo 'export PYTHONPATH="/home/agent:$PYTHONPATH"' >> /etc/skel-agent/.bashrc && \
+    echo 'alias ll="ls -la"' >> /etc/skel-agent/.bashrc && \
+    echo 'alias la="ls -la"' >> /etc/skel-agent/.bashrc && \
+    echo 'cd /home/agent' >> /etc/skel-agent/.bashrc && \
+    cp /etc/skel-agent/.bashrc /etc/skel-agent/.bash_profile && \
+    chown -R agent:agent /etc/skel-agent /etc/skel-agent-venv
+
+# Add entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 USER agent
 WORKDIR /home/agent
 
-# Create Python virtual environment and install common packages
-RUN python3 -m venv /home/agent/.venv && \
-    /home/agent/.venv/bin/pip install --upgrade pip && \
-    /home/agent/.venv/bin/pip install \
-    # Data science and analysis
-    numpy pandas matplotlib seaborn plotly
-
-# Configure shell environment
-RUN echo 'export PATH="/home/agent/.venv/bin:$PATH"' >> /home/agent/.bashrc && \
-    echo 'export PYTHONPATH="/home/agent:$PYTHONPATH"' >> /home/agent/.bashrc && \
-    echo 'alias ll="ls -la"' >> /home/agent/.bashrc && \
-    echo 'alias la="ls -la"' >> /home/agent/.bashrc && \
-    echo 'cd /home/agent' >> /home/agent/.bashrc
-
-# Default command
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["/bin/bash"]
 
 # Metadata
 LABEL maintainer="agent-computer" \
     description="Secure sandbox environment for AI agents solving ARC-AGI problems" \
-    version="1.1"
+    version="1.2"

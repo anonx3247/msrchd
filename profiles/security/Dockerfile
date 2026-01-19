@@ -29,26 +29,35 @@ RUN mkdir -p /home/agent/.ssh && \
     chown -R agent:agent /home/agent/.ssh && \
     chmod 700 /home/agent/.ssh
 
-USER agent
-WORKDIR /home/agent
-
-RUN ssh-keyscan github.com >> /home/agent/.ssh/known_hosts
-
-RUN python3 -m venv /home/agent/.venv && \
-    /home/agent/.venv/bin/pip install --upgrade pip && \
-    /home/agent/.venv/bin/pip install \
+# Create Python venv in a template location (will be copied to home on first run)
+RUN python3 -m venv /etc/skel-agent-venv && \
+    /etc/skel-agent-venv/bin/pip install --upgrade pip && \
+    /etc/skel-agent-venv/bin/pip install \
     numpy pandas matplotlib seaborn plotly \
     requests httpx beautifulsoup4 \
     frida-tools frida r2pipe angr
 
-RUN echo 'export PATH="/home/agent/.venv/bin:$PATH"' >> /home/agent/.bashrc && \
-    echo 'export PYTHONPATH="/home/agent:$PYTHONPATH"' >> /home/agent/.bashrc && \
-    echo 'alias ll="ls -la"' >> /home/agent/.bashrc && \
-    echo 'alias la="ls -la"' >> /home/agent/.bashrc && \
-    echo 'cd /home/agent' >> /home/agent/.bashrc
+# Create home directory template with dotfiles
+RUN mkdir -p /etc/skel-agent/.ssh && \
+    ssh-keyscan github.com > /etc/skel-agent/.ssh/known_hosts && \
+    echo 'export PATH="/home/agent/.venv/bin:$PATH"' >> /etc/skel-agent/.bashrc && \
+    echo 'export PYTHONPATH="/home/agent:$PYTHONPATH"' >> /etc/skel-agent/.bashrc && \
+    echo 'alias ll="ls -la"' >> /etc/skel-agent/.bashrc && \
+    echo 'alias la="ls -la"' >> /etc/skel-agent/.bashrc && \
+    echo 'cd /home/agent' >> /etc/skel-agent/.bashrc && \
+    cp /etc/skel-agent/.bashrc /etc/skel-agent/.bash_profile && \
+    chown -R agent:agent /etc/skel-agent /etc/skel-agent-venv
 
+# Add entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+USER agent
+WORKDIR /home/agent
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["/bin/bash"]
 
 LABEL maintainer="agent-computer" \
-      description="Secure sandbox environment for AI agents" \
-      version="1.1"
+      description="Secure sandbox environment for AI agents (security profile)" \
+      version="1.2"

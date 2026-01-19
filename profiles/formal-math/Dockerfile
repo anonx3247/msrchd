@@ -54,26 +54,35 @@ RUN ln -s /opt/lean/.elan/bin/lake /usr/local/bin/lake && \
     ln -s /opt/lean/.elan/bin/elan /usr/local/bin/elan && \
     ln -s /opt/lean/repl/.lake/build/bin/repl /usr/local/bin/repl
 
+# Create Python venv in a template location (will be copied to home on first run)
+RUN python3 -m venv /etc/skel-agent-venv && \
+    /etc/skel-agent-venv/bin/pip install --upgrade pip && \
+    /etc/skel-agent-venv/bin/pip install \
+    numpy pandas matplotlib seaborn plotly
+
+# Create home directory template with dotfiles
+RUN mkdir -p /etc/skel-agent && \
+    echo 'export ELAN_HOME=/opt/lean/.elan' >> /etc/skel-agent/.bashrc && \
+    echo 'export PATH="/opt/lean/.elan/bin:/home/agent/.venv/bin:$PATH"' >> /etc/skel-agent/.bashrc && \
+    echo 'export PYTHONPATH="/home/agent:$PYTHONPATH"' >> /etc/skel-agent/.bashrc && \
+    echo 'alias ll="ls -la"' >> /etc/skel-agent/.bashrc && \
+    echo 'alias la="ls -la"' >> /etc/skel-agent/.bashrc && \
+    echo '# Lean Math project is at /opt/lean/Math' >> /etc/skel-agent/.bashrc && \
+    echo '# Lean REPL is at /opt/lean/repl' >> /etc/skel-agent/.bashrc && \
+    echo 'cd /home/agent' >> /etc/skel-agent/.bashrc && \
+    cp /etc/skel-agent/.bashrc /etc/skel-agent/.bash_profile && \
+    chown -R agent:agent /etc/skel-agent /etc/skel-agent-venv
+
+# Add entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 USER agent
 WORKDIR /home/agent
 
-RUN python3 -m venv /home/agent/.venv && \
-    /home/agent/.venv/bin/pip install --upgrade pip && \
-    /home/agent/.venv/bin/pip install \
-    numpy pandas matplotlib seaborn plotly
-
-# Set up environment to use Lean from /opt/lean
-RUN echo 'export ELAN_HOME=/opt/lean/.elan' >> /home/agent/.bashrc && \
-    echo 'export PATH="/opt/lean/.elan/bin:/home/agent/.venv/bin:$PATH"' >> /home/agent/.bashrc && \
-    echo 'export PYTHONPATH="/home/agent:$PYTHONPATH"' >> /home/agent/.bashrc && \
-    echo 'alias ll="ls -la"' >> /home/agent/.bashrc && \
-    echo 'alias la="ls -la"' >> /home/agent/.bashrc && \
-    echo '# Lean Math project is at /opt/lean/Math' >> /home/agent/.bashrc && \
-    echo '# Lean REPL is at /opt/lean/repl' >> /home/agent/.bashrc && \
-    echo 'cd /home/agent' >> /home/agent/.bashrc
-
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["/bin/bash"]
 
 LABEL maintainer="agent-computer" \
     description="Secure sandbox environment for AI agents with Lean 4 and Mathlib" \
-    version="1.2"
+    version="1.3"
