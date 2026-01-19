@@ -3,7 +3,9 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    ELAN_HOME=/opt/lean/.elan \
+    PATH="/opt/lean/.elan/bin:/usr/local/bin:/usr/bin:/bin"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo bash coreutils findutils grep sed gawk \
@@ -69,4 +71,4 @@ CMD ["/bin/bash"]
 
 LABEL maintainer="agent-computer" \
     description="Secure sandbox environment for AI agents with Lean 4 and Mathlib" \
-    version="1.3"
+    version="1.4"
