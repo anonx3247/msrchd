@@ -35,7 +35,7 @@ function normalizeTokenPrices(
 }
 
 // https://platform.moonshot.ai/docs/pricing/chat#product-pricing
-const TOKEN_PRICING: Record<MoonshotAIModel, MoonshotAITokenPrices> = {
+export const TOKEN_PRICING: Record<MoonshotAIModel, MoonshotAITokenPrices> = {
   "kimi-k2-thinking": normalizeTokenPrices(0.6, 2.5, 0.15),
 };
 

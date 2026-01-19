@@ -41,7 +41,7 @@ function normalizeTokenPrices(
 }
 
 // https://api-docs.deepseek.com/quick_start/pricing
-const TOKEN_PRICING: Record<DeepseekModel, DeepseekTokenPrices> = {
+export const TOKEN_PRICING: Record<DeepseekModel, DeepseekTokenPrices> = {
   "deepseek-chat": normalizeTokenPrices(0.28, 0.42, 0.028),
   "deepseek-reasoner": normalizeTokenPrices(0.28, 0.42, 0.028),
 };

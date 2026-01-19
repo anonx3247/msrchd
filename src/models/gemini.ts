@@ -48,7 +48,7 @@ function normalizeTokenPrices(
 }
 
 // https://ai.google.dev/gemini-api/docs/pricing
-const TOKEN_PRICING: Record<GeminiModel, GeminiTokenPrices> = {
+export const TOKEN_PRICING: Record<GeminiModel, GeminiTokenPrices> = {
   "gemini-3-pro-preview": normalizeTokenPrices(2, 12),
   "gemini-2.5-pro": normalizeTokenPrices(1.25, 10),
   "gemini-2.5-flash": normalizeTokenPrices(0.3, 2.5),

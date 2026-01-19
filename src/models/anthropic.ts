@@ -11,7 +11,7 @@ const DEFAULT_MAX_TOKENS = 8192;
 const DEFAULT_THINKING_TOKENS = 8192;
 
 type AnthropicTokenPrices = {
-  baseInput: number;
+  input: number;
   cache5m: number;
   cache1h: number;
   cacheHits: number;
@@ -23,7 +23,7 @@ function normalizeTokenPrices(
   costPerMillionOutputTokens: number,
 ): AnthropicTokenPrices {
   return {
-    baseInput: costPerMillionInputTokens / 1_000_000,
+    input: costPerMillionInputTokens / 1_000_000,
     cache5m: (costPerMillionInputTokens * 1.25) / 1_000_000,
     cache1h: (costPerMillionInputTokens * 2) / 1_000_000,
     cacheHits: (costPerMillionInputTokens * 0.1) / 1_000_000,
@@ -32,7 +32,7 @@ function normalizeTokenPrices(
 }
 
 // https://docs.claude.com/en/docs/about-claude/pricing#model-pricing
-const TOKEN_PRICING: Record<AnthropicModel, AnthropicTokenPrices> = {
+export const TOKEN_PRICING: Record<AnthropicModel, AnthropicTokenPrices> = {
   "claude-opus-4-5": normalizeTokenPrices(5, 25),
   "claude-sonnet-4-5": normalizeTokenPrices(3, 15),
   "claude-haiku-4-5": normalizeTokenPrices(1, 5),
@@ -346,9 +346,9 @@ export class AnthropicLLM extends LLM {
   protected costPerTokenUsage(tokenUsage: TokenUsage): number {
     const pricing = TOKEN_PRICING[this.model];
     // For Anthropic, we use a conservative estimate:
-    // baseInput for non-cached tokens, cacheHits for cached tokens
+    // input for non-cached tokens, cacheHits for cached tokens
     const nonCachedInput = tokenUsage.input - tokenUsage.cached;
-    let c = nonCachedInput * pricing.baseInput;
+    let c = nonCachedInput * pricing.input;
     c += tokenUsage.cached * pricing.cacheHits;
     c += tokenUsage.output * pricing.output;
     return c;

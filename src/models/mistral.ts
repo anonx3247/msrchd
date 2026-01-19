@@ -36,7 +36,7 @@ function normalizeTokenPrices(
 }
 
 // https://mistral.ai/pricing#api-pricing
-const TOKEN_PRICING: Record<MistralModel, MistralTokenPrices> = {
+export const TOKEN_PRICING: Record<MistralModel, MistralTokenPrices> = {
   "devstral-medium-latest": normalizeTokenPrices(0.4, 2),
   "mistral-large-latest": normalizeTokenPrices(0.5, 1.5),
   "mistral-small-latest": normalizeTokenPrices(0.1, 0.3),
