@@ -425,7 +425,7 @@ export class Computer {
       durationMs: number;
     }>
   > {
-    const timeoutMs = options?.timeoutMs ?? 120000;
+    const timeoutMs = options?.timeoutMs ?? 360000;
     const cwd = options?.cwd ?? DEFAULT_WORKDIR;
 
     try {
