@@ -69,7 +69,8 @@ export type ErrorCode =
   | "pod_initialization_error"
   | "namespace_deletion_error"
   | "port_forward_error"
-  | "string_edit_error";
+  | "string_edit_error"
+  | "volume_init_error";
 
 export class SrchdError extends Error {
   constructor(

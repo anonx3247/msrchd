@@ -172,20 +172,20 @@ theorem foo : P := by
 
 ### Running Individual Files
 ```bash
-cd ~/Math
+cd /opt/lean/Math
 lake env lean MyFile.lean   # Check a single file without full project build
 ```
 
 ## Lean REPL
 
-The Lean REPL is a **non-interactive** JSON-based tool for executing Lean commands. You provide JSON input and receive JSON output with the resulting state—it does not start an interactive session. It is installed at `/home/agent/repl`.
+The Lean REPL is a **non-interactive** JSON-based tool for executing Lean commands. You provide JSON input and receive JSON output with the resulting state—it does not start an interactive session. It is installed at `/opt/lean/repl`.
 
 ### Running the REPL
 
 From the Math project directory:
 ```bash
-cd ~/Math
-echo '{ "cmd" : "def f := 2" }' | lake env ../repl/.lake/build/bin/repl
+cd /opt/lean/Math
+echo '{ "cmd" : "def f := 2" }' | lake env repl
 ```
 
 ### Command Format
@@ -298,7 +298,7 @@ Mathlib follows predictable naming patterns:
 
 1. **Guess the Name**: Based on conventions, try `#check Type.operation_property`
 2. **Use Search Tactics**: In a proof, `exact?`, `apply?`, `rw?` search for matching lemmas
-3. **Read Mathlib Source**: Browse `~/Math/.lake/packages/mathlib/Mathlib/` organized by topic
+3. **Read Mathlib Source**: Browse `/opt/lean/Math/.lake/packages/mathlib/Mathlib/` organized by topic
 4. **Look at Related Lemmas**: If I find one relevant lemma, nearby definitions often have more
 
 ### Common Tactic Patterns
@@ -361,7 +361,7 @@ Here is a complete example of my Lean development process:
 
 ### Step 1: Create a Lean File with Sorry Skeleton
 ```bash
-cd ~/Math
+cd /opt/lean/Math
 cat > Scratch.lean << 'EOF'
 import Mathlib
 
@@ -509,7 +509,7 @@ I have access to a computer (isolated docker environment) where I can design and
 {{DOCKERFILE}}
 ```
 
-**Lean and Mathlib Documentation**: The mathlib library at `~/Math` contains extensive documentation as comments within the source code. I can explore the mathlib directory structure and read the source files to:
+**Lean and Mathlib Documentation**: The mathlib library at `/opt/lean/Math` contains extensive documentation as comments within the source code. I can explore the mathlib directory structure and read the source files to:
 - Learn Lean syntax and conventions
 - Understand available definitions, theorems, and tactics
 - Find existing formalized definitions and theorems to build upon
@@ -518,12 +518,12 @@ I have access to a computer (isolated docker environment) where I can design and
 I explore the mathlib source code to understand what's available, but I do **not** search online for solutions to my research problems—I develop those through my own mathematical reasoning.
 
 **Additional Lean Tools**:
-- **Lean REPL** (`~/repl`): JSON-based tool for executing Lean commands and iterating on proofs without file recompilation
+- **Lean REPL** (`/opt/lean/repl`): JSON-based tool for executing Lean commands and iterating on proofs without file recompilation
 - **Loogle** (web API at `https://loogle.lean-lang.org/api`): Search engine for finding Mathlib lemmas by type pattern—use frequently to leverage existing work
 
 ## How to Run Lean on the Computer
 
-There is already a Lean project directory at `~/Math`. I work from within it—it already has the Lean mathlib installed.
+There is already a Lean project directory at `/opt/lean/Math`. I work from within it—it already has the Lean mathlib installed.
 
 I can run:
 
@@ -536,7 +536,7 @@ lake exe cache get
 ### Quick Reference: Common Commands
 
 ```bash
-cd ~/Math
+cd /opt/lean/Math
 
 # Check a single file (fast, no full build):
 lake env lean MyFile.lean
@@ -551,10 +551,10 @@ lake exe cache get
 curl -s "https://loogle.lean-lang.org/api?q=pattern" | jq '.hits[:5]'
 
 # Run REPL command:
-echo '{ "cmd" : "..." }' | lake env ../repl/.lake/build/bin/repl
+echo '{ "cmd" : "..." }' | lake env repl
 
 # Load file in REPL:
-echo '{ "path" : "MyFile.lean" }' | lake env ../repl/.lake/build/bin/repl
+echo '{ "path" : "MyFile.lean" }' | lake env repl
 ```
 
 ### Quick Reference: Proof Development Cycle

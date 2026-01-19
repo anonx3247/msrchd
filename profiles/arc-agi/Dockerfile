@@ -54,4 +54,4 @@ CMD ["/bin/bash"]
 # Metadata
 LABEL maintainer="agent-computer" \
     description="Secure sandbox environment for AI agents solving ARC-AGI problems" \
-    version="1.1"
+    version="1.2"

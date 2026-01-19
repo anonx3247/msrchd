@@ -48,6 +48,15 @@ RUN export ELAN_HOME=/opt/lean/.elan && \
     lake build && \
     chown -R agent:agent /opt/lean/repl
 
+# Create symlinks for easy access to Lean tools
+RUN ln -s /opt/lean/.elan/bin/lake /usr/local/bin/lake && \
+    ln -s /opt/lean/.elan/bin/lean /usr/local/bin/lean && \
+    ln -s /opt/lean/.elan/bin/elan /usr/local/bin/elan && \
+    ln -s /opt/lean/repl/.lake/build/bin/repl /usr/local/bin/repl
+
+# Fix permissions on all of /opt/lean (toolchains installed by lake are owned by root)
+RUN chown -R agent:agent /opt/lean
+
 USER agent
 WORKDIR /home/agent
 
@@ -70,4 +79,4 @@ CMD ["/bin/bash"]
 
 LABEL maintainer="agent-computer" \
     description="Secure sandbox environment for AI agents with Lean 4 and Mathlib" \
-    version="1.2"
+    version="1.3"

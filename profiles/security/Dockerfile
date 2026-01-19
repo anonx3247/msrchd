@@ -50,5 +50,5 @@ RUN echo 'export PATH="/home/agent/.venv/bin:$PATH"' >> /home/agent/.bashrc && \
 CMD ["/bin/bash"]
 
 LABEL maintainer="agent-computer" \
-      description="Secure sandbox environment for AI agents" \
-      version="1.1"
+      description="Secure sandbox environment for AI agents (security profile)" \
+      version="1.2"
