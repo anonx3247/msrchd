@@ -1,4 +1,4 @@
-# Dockerfile for agent-computer:base
+# Dockerfile for agent-computer:research
 # Provides a secure, isolated environment for AI agents to execute code
 
 FROM ubuntu:24.04
@@ -38,7 +38,6 @@ RUN mkdir -p /home/agent/.ssh && \
     chmod 700 /home/agent/.ssh
 
 USER agent
-# IDENTITY_FILES_COPY_PLACEHOLDER
 WORKDIR /home/agent
 
 # Create Python virtual environment and install common packages
@@ -61,4 +60,4 @@ CMD ["/bin/bash"]
 # Metadata
 LABEL maintainer="agent-computer" \
       description="Secure sandbox environment for AI agents" \
-      version="1.1"
+      version="1.2"

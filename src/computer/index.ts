@@ -37,13 +37,107 @@ async function ensureImage(image: string): Promise<Result<void>> {
   }
 }
 
-async function ensureVolume(name: string): Promise<Result<void>> {
+async function ensureVolume(name: string): Promise<Result<{ isNew: boolean }>> {
   try {
     await docker.getVolume(name).inspect();
+    return ok({ isNew: false });
   } catch {
     await docker.createVolume({ Name: name });
+    return ok({ isNew: true });
   }
-  return ok(undefined);
+}
+
+// Initialize a new volume with the home directory contents from the image
+async function initializeVolume(
+  volumeName: string,
+  imageName: string,
+): Promise<Result<void>> {
+  const tempName = `init-${volumeName}-${Date.now()}`;
+  try {
+    // Create temp container WITHOUT volume to access image's /home/agent
+    const tempContainer = await docker.createContainer({
+      name: tempName,
+      Image: imageName,
+      Cmd: ["/bin/bash", "-c", "tar cf - -C /home/agent ."],
+      Tty: false,
+      AttachStdout: true,
+      AttachStderr: true,
+    });
+
+    // Start and get the tar output
+    const stream = await tempContainer.attach({
+      stream: true,
+      stdout: true,
+      stderr: true,
+    });
+
+    await tempContainer.start();
+
+    // Collect tar data
+    const chunks: Buffer[] = [];
+    await new Promise<void>((resolve, reject) => {
+      stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+      stream.on("end", resolve);
+      stream.on("error", reject);
+    });
+
+    await tempContainer.wait();
+    await tempContainer.remove();
+
+    const tarData = Buffer.concat(chunks);
+
+    // Now create another temp container WITH volume to extract the tar
+    const extractContainer = await docker.createContainer({
+      name: `extract-${tempName}`,
+      Image: imageName,
+      Cmd: ["/bin/bash", "-c", "tar xf - -C /home/agent"],
+      Tty: false,
+      AttachStdin: true,
+      OpenStdin: true,
+      StdinOnce: true,
+      HostConfig: {
+        Binds: [`${volumeName}:${DEFAULT_WORKDIR}:rw`],
+      },
+    });
+
+    const extractStream = await extractContainer.attach({
+      stream: true,
+      stdin: true,
+      stdout: true,
+      stderr: true,
+      hijack: true,
+    });
+
+    await extractContainer.start();
+
+    // Write tar data to stdin
+    extractStream.write(tarData);
+    extractStream.end();
+
+    await extractContainer.wait();
+    await extractContainer.remove();
+
+    return ok(undefined);
+  } catch (error: any) {
+    // Clean up temp containers on error
+    try {
+      const temp = docker.getContainer(tempName);
+      await temp.remove({ force: true });
+    } catch {
+      // ignore
+    }
+    try {
+      const extract = docker.getContainer(`extract-${tempName}`);
+      await extract.remove({ force: true });
+    } catch {
+      // ignore
+    }
+    return err(
+      "volume_init_error",
+      `Failed to initialize volume: ${error.message}`,
+      error,
+    );
+  }
 }
 
 export class Computer {
@@ -72,6 +166,14 @@ export class Computer {
       const volumeRes = await ensureVolume(volume);
       if (volumeRes.isErr()) {
         return volumeRes;
+      }
+
+      // Initialize new volumes with home directory contents from the image
+      if (volumeRes.value.isNew) {
+        const initRes = await initializeVolume(volume, image);
+        if (initRes.isErr()) {
+          return initRes;
+        }
       }
 
       const container = await docker.createContainer({
