@@ -185,7 +185,7 @@ The Lean REPL is a **non-interactive** JSON-based tool for executing Lean comman
 From the Math project directory:
 ```bash
 cd /opt/lean/Math
-echo '{ "cmd" : "def f := 2" }' | lake env /opt/lean/repl/.lake/build/bin/repl
+echo '{ "cmd" : "def f := 2" }' | lake env repl
 ```
 
 ### Command Format
@@ -551,10 +551,10 @@ lake exe cache get
 curl -s "https://loogle.lean-lang.org/api?q=pattern" | jq '.hits[:5]'
 
 # Run REPL command:
-echo '{ "cmd" : "..." }' | lake env /opt/lean/repl/.lake/build/bin/repl
+echo '{ "cmd" : "..." }' | lake env repl
 
 # Load file in REPL:
-echo '{ "path" : "MyFile.lean" }' | lake env /opt/lean/repl/.lake/build/bin/repl
+echo '{ "path" : "MyFile.lean" }' | lake env repl
 ```
 
 ### Quick Reference: Proof Development Cycle

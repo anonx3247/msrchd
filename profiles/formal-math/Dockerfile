@@ -48,6 +48,12 @@ RUN export ELAN_HOME=/opt/lean/.elan && \
     lake build && \
     chown -R agent:agent /opt/lean/repl
 
+# Create symlinks for easy access to Lean tools
+RUN ln -s /opt/lean/.elan/bin/lake /usr/local/bin/lake && \
+    ln -s /opt/lean/.elan/bin/lean /usr/local/bin/lean && \
+    ln -s /opt/lean/.elan/bin/elan /usr/local/bin/elan && \
+    ln -s /opt/lean/repl/.lake/build/bin/repl /usr/local/bin/repl
+
 USER agent
 WORKDIR /home/agent
 
