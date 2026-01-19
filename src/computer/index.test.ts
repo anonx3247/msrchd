@@ -80,9 +80,26 @@ async function runTest() {
     allPassed = false;
   }
 
-  // Test 5: Check lake command is available (formal-math specific)
-  console.log("6. Checking lake command (formal-math profile)...");
-  const lakeRes = await computer.execute("lake --version");
+  // Test 5: Check /opt/lean permissions
+  console.log("6. Checking /opt/lean permissions...");
+  const permRes = await computer.execute("ls -la /opt/lean/.elan/toolchains/ 2>&1 | head -5");
+  if (permRes.isOk()) {
+    console.log("   /opt/lean/.elan/toolchains/ listing:");
+    console.log("  ", permRes.value.stdout.split("\n").slice(0, 3).join("\n   "));
+    if (permRes.value.stderr.includes("Permission denied")) {
+      console.error("❌ Permission denied - image needs rebuild with permissions fix\n");
+      allPassed = false;
+    } else {
+      console.log("✓ Permissions look ok\n");
+    }
+  }
+
+  // Test 6: Check lake command is available (formal-math specific)
+  // Note: lake/lean need ELAN_HOME to find toolchains
+  const leanEnv = { ELAN_HOME: "/opt/lean/.elan" };
+
+  console.log("7. Checking lake command (formal-math profile)...");
+  const lakeRes = await computer.execute("lake --version", { env: leanEnv });
   if (lakeRes.isOk() && lakeRes.value.exitCode === 0) {
     console.log("✓ lake works:", lakeRes.value.stdout.trim(), "\n");
   } else {
@@ -96,9 +113,9 @@ async function runTest() {
     allPassed = false;
   }
 
-  // Test 6: Check lean command is available
-  console.log("7. Checking lean command...");
-  const leanRes = await computer.execute("lean --version");
+  // Test 7: Check lean command is available
+  console.log("8. Checking lean command...");
+  const leanRes = await computer.execute("lean --version", { env: leanEnv });
   if (leanRes.isOk() && leanRes.value.exitCode === 0) {
     console.log("✓ lean works:", leanRes.value.stdout.trim(), "\n");
   } else {
@@ -106,8 +123,8 @@ async function runTest() {
     allPassed = false;
   }
 
-  // Test 7: Check /opt/lean/Math exists
-  console.log("8. Checking /opt/lean/Math project...");
+  // Test 8: Check /opt/lean/Math exists
+  console.log("9. Checking /opt/lean/Math project...");
   const mathRes = await computer.execute("test -d /opt/lean/Math && echo 'exists'");
   if (mathRes.isOk() && mathRes.value.stdout.includes("exists")) {
     console.log("✓ /opt/lean/Math exists\n");
@@ -117,7 +134,7 @@ async function runTest() {
   }
 
   // Cleanup
-  console.log("9. Cleaning up...");
+  console.log("10. Cleaning up...");
   const terminateRes = await computer.terminate();
   if (terminateRes.isOk()) {
     console.log("✓ Computer terminated\n");
