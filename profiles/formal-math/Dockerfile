@@ -54,6 +54,9 @@ RUN ln -s /opt/lean/.elan/bin/lake /usr/local/bin/lake && \
     ln -s /opt/lean/.elan/bin/elan /usr/local/bin/elan && \
     ln -s /opt/lean/repl/.lake/build/bin/repl /usr/local/bin/repl
 
+# Fix permissions on all of /opt/lean (toolchains installed by lake are owned by root)
+RUN chown -R agent:agent /opt/lean
+
 USER agent
 WORKDIR /home/agent
 
