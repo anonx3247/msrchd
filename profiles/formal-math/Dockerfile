@@ -18,17 +18,40 @@ RUN groupadd -g 1001 agent && \
     useradd -u 1001 -g 1001 -m -s /bin/bash agent && \
     echo 'agent ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-# Install Lean, Mathlib, REPL, and Loogle
-RUN export HOME=/home/agent && \
-    curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y && \
-    echo 'export PATH="/home/agent/.elan/bin:$PATH"' >> /home/agent/.bashrc && \
-    export PATH="/home/agent/.elan/bin:$PATH" && \
-    # Create Math project with mathlib
-    cd /home/agent/ && \
+# Create /opt/lean directory for Lean installation (separate from user home volume)
+RUN mkdir -p /opt/lean && chown agent:agent /opt/lean
+
+# Configure git to allow /opt/lean directory and set HOME for git operations
+RUN git config --global --add safe.directory /opt/lean && \
+    git config --global --add safe.directory '*'
+
+# Install elan (Lean version manager) to /opt/lean
+RUN export HOME=/root && \
+    export ELAN_HOME=/opt/lean/.elan && \
+    curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --no-modify-path && \
+    chown -R agent:agent /opt/lean/.elan
+
+# Create Math project with mathlib in /opt/lean
+RUN export HOME=/root && \
+    export ELAN_HOME=/opt/lean/.elan && \
+    export PATH="/opt/lean/.elan/bin:$PATH" && \
+    cd /opt/lean && \
     lake +leanprover-community/mathlib4:lean-toolchain new Math math && \
-    cd Math && lake exe cache get && lake build && \
-    # Install Lean REPL (use Math project's toolchain for compatibility)
-    cd /home/agent && \
+    cd Math && lake exe cache get && \
+    chown -R agent:agent /opt/lean/Math
+
+# Build Math project
+RUN export HOME=/root && \
+    export ELAN_HOME=/opt/lean/.elan && \
+    export PATH="/opt/lean/.elan/bin:$PATH" && \
+    cd /opt/lean/Math && lake build && \
+    chown -R agent:agent /opt/lean/Math
+
+# Install Lean REPL
+RUN export HOME=/root && \
+    export ELAN_HOME=/opt/lean/.elan && \
+    export PATH="/opt/lean/.elan/bin:$PATH" && \
+    cd /opt/lean && \
     git clone https://github.com/leanprover-community/repl.git && \
     cd repl && \
     cp /home/agent/Math/lean-toolchain . && \
