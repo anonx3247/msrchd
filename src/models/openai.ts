@@ -29,7 +29,7 @@ function normalizeTokenPrices(
 }
 
 // https://platform.openai.com/docs/pricing
-const TOKEN_PRICING: Record<OpenAIModel, OpenAITokenPrices> = {
+export const TOKEN_PRICING: Record<OpenAIModel, OpenAITokenPrices> = {
   "gpt-5.2-pro": normalizeTokenPrices(21, 168),
   "gpt-5.2": normalizeTokenPrices(1.75, 14),
   "gpt-5": normalizeTokenPrices(1.25, 10),

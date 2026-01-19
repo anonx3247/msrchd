@@ -9,6 +9,7 @@ import { isArrayOf, isString, removeNulls } from "./lib/utils";
 import { buildComputerImage } from "./computer/image";
 import { computerId, Computer } from "./computer";
 import { Model, isModel } from "./models/provider";
+import { getAllModels, formatPrice } from "./models/info";
 import { MessageResource } from "./resources/messages";
 import { db } from "./db";
 import {
@@ -484,6 +485,35 @@ program
       port,
       hostname: options.host,
     });
+  });
+
+// Models command - show all available models with pricing
+program
+  .command("models")
+  .description("List all available models with their providers and pricing")
+  .action(async () => {
+    const models = getAllModels();
+
+    console.log("\nAvailable Models:\n");
+    console.log(
+      "  " +
+        "Model".padEnd(40) +
+        "Provider".padEnd(12) +
+        "Input $/Mtok".padEnd(14) +
+        "Output $/Mtok",
+    );
+    console.log("  " + "-".repeat(78));
+
+    for (const model of models) {
+      console.log(
+        "  " +
+          model.model.padEnd(40) +
+          model.provider.padEnd(12) +
+          formatPrice(model.inputPrice).padEnd(14) +
+          formatPrice(model.outputPrice),
+      );
+    }
+    console.log();
   });
 
 program.parse();
