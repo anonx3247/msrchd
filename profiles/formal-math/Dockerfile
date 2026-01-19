@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     ELAN_HOME=/opt/lean/.elan \
-    PATH="/opt/lean/.elan/bin:/usr/local/bin:/usr/bin:/bin"
+    PATH="/opt/lean/.elan/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo bash coreutils findutils grep sed gawk \
