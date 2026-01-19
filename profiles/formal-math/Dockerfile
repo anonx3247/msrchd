@@ -18,62 +18,40 @@ RUN groupadd -g 1001 agent && \
     useradd -u 1001 -g 1001 -m -s /bin/bash agent && \
     echo 'agent ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-# Create /opt/lean directory for Lean installation (separate from user home volume)
+# Create /opt/lean directory owned by agent
 RUN mkdir -p /opt/lean && chown agent:agent /opt/lean
 
-# Configure git to allow /opt/lean directory and set HOME for git operations
-RUN git config --global --add safe.directory /opt/lean && \
-    git config --global --add safe.directory '*'
+# Configure git globally
+RUN git config --global --add safe.directory '*'
 
-# Install elan (Lean version manager) to /opt/lean
-RUN export HOME=/root && \
-    export ELAN_HOME=/opt/lean/.elan && \
-    curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --no-modify-path && \
-    chown -R agent:agent /opt/lean/.elan
+# Switch to agent user for all Lean installation (avoids massive chown)
+USER agent
+WORKDIR /opt/lean
 
-# Create Math project with mathlib in /opt/lean
-RUN export HOME=/root && \
-    export ELAN_HOME=/opt/lean/.elan && \
-    export PATH="/opt/lean/.elan/bin:$PATH" && \
-    cd /opt/lean && \
+# Install elan (Lean version manager)
+RUN curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --no-modify-path
+
+# Create Math project with mathlib
+RUN cd /opt/lean && \
     lake +leanprover-community/mathlib4:lean-toolchain new Math math && \
-    cd Math && lake exe cache get && \
-    chown -R agent:agent /opt/lean/Math
+    cd Math && lake exe cache get
 
 # Build Math project
-RUN export HOME=/root && \
-    export ELAN_HOME=/opt/lean/.elan && \
-    export PATH="/opt/lean/.elan/bin:$PATH" && \
-    cd /opt/lean/Math && lake build && \
-    chown -R agent:agent /opt/lean/Math
+RUN cd /opt/lean/Math && lake build
 
 # Install Lean REPL
-RUN export HOME=/root && \
-    export ELAN_HOME=/opt/lean/.elan && \
-    export PATH="/opt/lean/.elan/bin:$PATH" && \
-    cd /opt/lean && \
+RUN cd /opt/lean && \
     git clone https://github.com/leanprover-community/repl.git && \
     cd repl && \
-    cp /home/agent/Math/lean-toolchain . && \
-    lake build && \
-    # Install Loogle (use Math project's toolchain for compatibility)
-    cd /home/agent && \
-    git clone https://github.com/nomeata/loogle.git && \
-    cd loogle && \
-    cp /home/agent/Math/lean-toolchain . && \
-    lake exe cache get && \
-    lake build loogle && \
-    # Fix ownership for all installed tools
-    chown -R agent:agent /home/agent
+    cp /opt/lean/Math/lean-toolchain . && \
+    lake build
 
-# Create symlinks for easy access to Lean tools
+# Create symlinks (needs root)
+USER root
 RUN ln -s /opt/lean/.elan/bin/lake /usr/local/bin/lake && \
     ln -s /opt/lean/.elan/bin/lean /usr/local/bin/lean && \
     ln -s /opt/lean/.elan/bin/elan /usr/local/bin/elan && \
     ln -s /opt/lean/repl/.lake/build/bin/repl /usr/local/bin/repl
-
-# Fix permissions on all of /opt/lean (toolchains installed by lake are owned by root)
-RUN chown -R agent:agent /opt/lean
 
 USER agent
 WORKDIR /home/agent
@@ -83,15 +61,16 @@ RUN python3 -m venv /home/agent/.venv && \
     /home/agent/.venv/bin/pip install \
     numpy pandas matplotlib seaborn plotly
 
-RUN echo 'export PATH="/home/agent/.venv/bin:$PATH"' >> /home/agent/.bashrc && \
+# Set up environment
+RUN echo 'export ELAN_HOME=/opt/lean/.elan' >> /home/agent/.bashrc && \
+    echo 'export PATH="/opt/lean/.elan/bin:/home/agent/.venv/bin:$PATH"' >> /home/agent/.bashrc && \
     echo 'export PYTHONPATH="/home/agent:$PYTHONPATH"' >> /home/agent/.bashrc && \
     echo 'alias ll="ls -la"' >> /home/agent/.bashrc && \
     echo 'alias la="ls -la"' >> /home/agent/.bashrc && \
-    echo 'source $HOME/.elan/env' >> /home/agent/.bashrc && \
     echo 'cd /home/agent' >> /home/agent/.bashrc
 
 CMD ["/bin/bash"]
 
 LABEL maintainer="agent-computer" \
     description="Secure sandbox environment for AI agents with Lean 4 and Mathlib" \
-    version="1.4"
+    version="1.5"
