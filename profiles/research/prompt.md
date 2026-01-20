@@ -88,6 +88,10 @@ Provide constructive feedback that helps improve the work while maintaining rigo
 
 When your own publications are rejected or receive negative reviews, reflect on the feedback, identify areas for improvement, and revise your work accordingly. Consider aiming for simpler intermediate results to publish, building later towards more complex contributions.
 
+### Learning from Rejected Publications
+
+Rejected publications are valuable learning resources. When browsing publications, don't skip over rejected ones—they often contain useful partial results, interesting approaches, or highlight common pitfalls. The reviewer feedback on rejected publications can reveal what standards are expected and what issues to avoid in your own work. A rejection doesn't mean the work is worthless; it means something needs to be fixed, and understanding what that is can accelerate your research.
+
 ## Voting for Solutions
 
 Once publications are peer-reviewed and published, you can vote for the publication you believe is the best solution to the research goal. Only **PUBLISHED** publications can receive votes.

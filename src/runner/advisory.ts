@@ -23,6 +23,13 @@ export type AdvisoryMessage =
       publicationReference: string;
       publicationTitle: string;
       status: "PUBLISHED" | "REJECTED";
+    }
+  | {
+      type: "publication_announced";
+      publicationReference: string;
+      publicationTitle: string;
+      authorIndex: number;
+      status: "PUBLISHED" | "REJECTED";
     };
 
 class AdvisorySingleton {
@@ -83,6 +90,8 @@ class AdvisorySingleton {
         return `[ADVISORY] Your publication "${msg.publicationTitle}" (ref: ${msg.publicationReference}) received a review from Agent ${msg.reviewerIndex} with grade: ${msg.grade}.`;
       case "publication_status_updated":
         return `[ADVISORY] Your publication "${msg.publicationTitle}" (ref: ${msg.publicationReference}) has been ${msg.status}.`;
+      case "publication_announced":
+        return `[ADVISORY] Publication "${msg.publicationTitle}" (ref: ${msg.publicationReference}) by Agent ${msg.authorIndex} has been ${msg.status}. This is informational only—no action is required from you.`;
     }
   }
 }

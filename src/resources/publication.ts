@@ -328,6 +328,19 @@ export class PublicationResource {
         status: "PUBLISHED",
       });
 
+      // Notify all other agents about the publication (informational only)
+      for (const agentIndex of this.experiment.getAgentIndices()) {
+        if (agentIndex !== this.data.author) {
+          Advisory.push(agentIndex, {
+            type: "publication_announced",
+            publicationReference: this.data.reference,
+            publicationTitle: this.data.title,
+            authorIndex: this.data.author,
+            status: "PUBLISHED",
+          });
+        }
+      }
+
       return ok(this);
     } catch (error) {
       return err(
@@ -362,6 +375,19 @@ export class PublicationResource {
         publicationTitle: this.data.title,
         status: "REJECTED",
       });
+
+      // Notify all other agents about the rejection (informational only)
+      for (const agentIndex of this.experiment.getAgentIndices()) {
+        if (agentIndex !== this.data.author) {
+          Advisory.push(agentIndex, {
+            type: "publication_announced",
+            publicationReference: this.data.reference,
+            publicationTitle: this.data.title,
+            authorIndex: this.data.author,
+            status: "REJECTED",
+          });
+        }
+      }
 
       return ok(this);
     } catch (error) {
