@@ -11,12 +11,14 @@ import { newID6 } from "@app/lib/utils";
 import fs from "fs";
 import path from "path";
 
+const PUBLICATIONS_DIR = process.env.PUBLICATIONS_DIR ?? "publications";
+
 const SERVER_NAME = "publications";
 
 const SERVER_VERSION = "0.1.0";
 
 export function writePublicationContent(reference: string, content: string): void {
-  const publicationDir = path.join("publications", reference);
+  const publicationDir = path.join(PUBLICATIONS_DIR, reference);
   const publicationFile = path.join(publicationDir, "publication.md");
   fs.mkdirSync(publicationDir, { recursive: true });
   fs.writeFileSync(publicationFile, content, "utf-8");
@@ -37,7 +39,7 @@ export function extractReferences(content: string): string[] {
 }
 
 export function getPublicationPath(reference: string): string {
-  return path.join("publications", reference);
+  return path.join(PUBLICATIONS_DIR, reference);
 }
 
 export function getPublicationFilePath(reference: string): string {
@@ -64,7 +66,7 @@ grade=${review.grade ?? "PENDING"}`;
 
 
 export function getAttachmentPath(reference: string, filename?: string) {
-  const pth = ["publications", reference];
+  const pth = [PUBLICATIONS_DIR, reference];
   if (filename) {
     pth.push(path.basename(filename));
   }
