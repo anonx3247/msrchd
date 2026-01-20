@@ -354,6 +354,18 @@ program
     try {
       await Promise.all(runnerPromises);
     } catch (error) {
+      // Print error details before fastShutdown (which calls process.exit)
+      const e = error as Err<SrchdError>;
+      if (e.error?.code) {
+        console.error(`\x1b[31mError [${e.error.code}] ${e.error.message}\x1b[0m`);
+        if (e.error.cause) {
+          console.error(`\x1b[31mCause: ${e.error.cause.message}\x1b[0m`);
+          console.error(e.error.cause.stack);
+        }
+      } else {
+        // Raw error case
+        console.error(`\x1b[31mError: ${error}\x1b[0m`);
+      }
       fastShutdown("Error occurred.");
       return exitWithError(error as any);
     }
