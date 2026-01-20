@@ -238,33 +238,43 @@ The REPL excels at rapid proof iteration:
 
 ## Loogle (Lemma Search)
 
-Loogle is a search engine for Mathlib lemmas. **Use Loogle frequently** to find existing lemmas and theorems—leverage mathlib's extensive library rather than reinventing proofs. It is installed at `/home/agent/loogle`.
+Loogle is a search engine for Mathlib lemmas. **Use Loogle frequently** to find existing lemmas and theorems—leverage mathlib's extensive library rather than reinventing proofs. Access it via the web API.
 
-### Running Loogle
+### Using Loogle
 
 ```bash
-cd ~/Math
-lake env ../loogle/.lake/build/bin/loogle 'pattern'
+# Search for a lemma by name
+curl -s "https://loogle.lean-lang.org/json?q=Nat.add_comm" | jq '.hits[:5]'
+
+# Search for lemmas about a function
+curl -s "https://loogle.lean-lang.org/json?q=List.replicate" | jq '.hits[:5]'
+
+# Search for lemmas involving Finset.sum
+curl -s "https://loogle.lean-lang.org/json?q=Finset.sum" | jq '.hits[:5]'
 ```
 
 ### Search Patterns
 
-Use type patterns with underscores as wildcards:
+You can search by:
+- **Name**: `Nat.add_comm`, `List.replicate`
+- **Partial name**: `add_comm` finds all lemmas containing "add_comm"
+- **Function**: `Finset.sum` finds lemmas using that function
 
+URL-encode spaces as `%20` in queries:
 ```bash
-# Find lemmas about list replication
-lake env ../loogle/.lake/build/bin/loogle 'List.replicate (_ + _) _ = _'
+# Find lemmas about List.length
+curl -s "https://loogle.lean-lang.org/json?q=List.length" | jq '.hits[:5]'
 
-# Find lemmas with specific type signatures
-lake env ../loogle/.lake/build/bin/loogle 'Nat -> Nat -> Nat'
-
-# Find lemmas involving a specific function
-lake env ../loogle/.lake/build/bin/loogle 'Finset.sum'
+# Find ring homomorphism lemmas
+curl -s "https://loogle.lean-lang.org/json?q=RingHom" | jq '.hits[:5]'
 ```
 
-### Options
-- `--json` or `-j`: JSON output
-- `--interactive` or `-i`: Read queries from stdin
+### API Response
+
+The API returns JSON with a `hits` array. Each hit contains:
+- `name`: Full lemma name (e.g., `List.replicate_add`)
+- `type`: The lemma's type signature
+- `doc`: Documentation string if available
 
 ### When to Use Loogle
 
@@ -513,7 +523,7 @@ I explore the mathlib source code to understand what's available, but I do **not
 
 **Additional Lean Tools**:
 - **Lean REPL** (`/opt/lean/repl`): JSON-based tool for executing Lean commands and iterating on proofs without file recompilation
-- **Loogle** (web API at `https://loogle.lean-lang.org/api`): Search engine for finding Mathlib lemmas by type pattern—use frequently to leverage existing work
+- **Loogle** (web API at `https://loogle.lean-lang.org/json`): Search engine for finding Mathlib lemmas by type pattern—use frequently to leverage existing work
 
 ## How to Run Lean on the Computer
 
