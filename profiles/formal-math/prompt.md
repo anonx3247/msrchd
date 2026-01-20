@@ -517,32 +517,33 @@ I explore the mathlib source code to understand what's available, but I do **not
 
 ## How to Run Lean on the Computer
 
-There is already a Lean project directory at `/opt/lean/Math`. I work from within it—it already has the Lean mathlib installed.
+There is already a Lean project directory at `/opt/lean/Math` with mathlib **fully installed and cached**.
 
-I can run:
+**IMPORTANT - Use the existing project:**
+- **ALWAYS work inside `/opt/lean/Math`** — create your .lean files there
+- **NEVER run `lake exe cache get`** — the cache is already downloaded
+- **NEVER create new projects with `lake new`** — use the existing Math project
+- **NEVER run `lake update`** — it will take too long
 
-```bash
-lake exe cache get
-```
-
-**DO NOT UPDATE MATHLIB—IT WILL TAKE TOO LONG**
+The mathlib cache at `/opt/lean/Math` is pre-built. Running `lake exe cache get` again will waste time re-downloading gigabytes of data. Simply create your .lean files in `/opt/lean/Math` and compile them.
 
 ### Quick Reference: Common Commands
 
 ```bash
 cd /opt/lean/Math
 
+# Create a new file and check it (the standard workflow):
+cat > MyProof.lean << 'EOF'
+import Mathlib
+-- your code here
+EOF
+lake env lean MyProof.lean
+
 # Check a single file (fast, no full build):
 lake env lean MyFile.lean
 
 # Build the whole project (slower, checks everything):
 lake build
-
-# Get mathlib cache (if needed):
-lake exe cache get
-
-# Search for lemmas by pattern (Loogle) - USE OFTEN:
-lake env ../loogle/.lake/build/bin/loogle 'pattern'
 
 # Run REPL command:
 echo '{ "cmd" : "..." }' | lake env repl
