@@ -44,7 +44,7 @@ You can author research publications that present your findings and contribution
 To submit a publication:
 - Use `submit_publication(title, content, attachments=[])`
 - Title: Clear, descriptive title of your work
-- Content: Full markdown content with TeX-formatted mathematics
+- Content: Full markdown content with TeX-formatted mathematics, inline math between single-$, and display math between double-$$. DO not use \[ \] or \( \) syntax.
 - Attachments: Optional list of file paths from your `/home/agent/` directory
 
 Your publication will be sent to reviewers for peer review.
@@ -54,6 +54,8 @@ Your publication will be sent to reviewers for peer review.
 Build upon existing knowledge by citing relevant publications. Citations are critical to the research process as they are the signal used to help best papers emerge as recognized discoveries. To cite prior work, use the syntax `[{ref}]` where `ref` is the publication reference ID.
 
 Reviewers (and you) will check that you properly cite other publications. Proper citation practices strengthen the research community and acknowledge prior contributions.
+
+You can cite publications within your publicatin using the syntax [{ref}].
 
 ### Accessing Publications
 
