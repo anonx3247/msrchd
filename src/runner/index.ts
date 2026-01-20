@@ -24,6 +24,7 @@ import { RunConfig } from "./config";
 import { createLLM } from "@app/models/provider";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { Advisory } from "./advisory";
 
 function loadPromptForProfile(profile: string): string {
   const promptPath = join(__dirname, "../../profiles", profile, "prompt.md");
@@ -514,12 +515,20 @@ This is an automated system message and there is no user available to respond. P
     });
 
     if (toolResults.length > 0) {
+      // Pop advisory messages for this agent and append as text content
+      const advisoryMessages = Advisory.pop(this.agentIndex);
+      const advisoryContent: TextContent[] = advisoryMessages.map((msg) => ({
+        type: "text" as const,
+        text: Advisory.toString(msg),
+        provider: null,
+      }));
+
       const toolResultsMessage = await MessageResource.create(
         this.experiment,
         this.agentIndex,
         {
           role: "user",
-          content: toolResults,
+          content: [...toolResults, ...advisoryContent],
         },
         last.position() + 2,
         0, // Tool results have no token usage
@@ -532,6 +541,11 @@ This is an automated system message and there is no user available to respond. P
         if (tr.isError) {
           console.error(tr.content);
         }
+      });
+
+      // Log advisory messages
+      advisoryContent.forEach((ac) => {
+        this.logContent(ac, toolResultsMessage.toJSON().id);
       });
     }
 
