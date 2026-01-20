@@ -232,7 +232,7 @@ ${r.content ?? "(pending)"}`;
       content: z
         .string()
         .describe(
-          "Full content of the publication. Use [{ref}] or [{ref},{ref}] inlined in content for citations.",
+          `Full content of the publication in markdown format. Use [{ref}] or [{ref},{ref}] inlined in content for citations. For equations, use $...$ for inline math and $$...$$ for display math. Do NOT use \\[ \\] or \\( \\) syntax as it will not render correctly - use purely $-based syntax.`,
         ),
       attachments: z
         .array(z.string())
