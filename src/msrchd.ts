@@ -5,6 +5,7 @@ import { readFileContent } from "./lib/fs";
 import { Err, err, SrchdError } from "./lib/error";
 import { ExperimentResource } from "./resources/experiment";
 import { Runner } from "./runner";
+import { Advisory } from "./runner/advisory";
 import { isArrayOf, isString, removeNulls } from "./lib/utils";
 import { buildComputerImage } from "./computer/image";
 import { computerId, Computer } from "./computer";
@@ -259,6 +260,9 @@ program
       }),
     );
 
+    // Initialize Advisory system with agent indices
+    Advisory.init(agentIndices);
+
     // Run single tick if specified
     if (options.tick !== undefined) {
       const tickResults = await Promise.all(runners.map((r) => r.tick()));
@@ -364,7 +368,7 @@ program
         }
       } else {
         // Raw error case
-        console.error(`\x1b[31mError: ${error}\x1b[0m`);
+        console.error(`\x1b[31mError: ${String(error)}\x1b[0m`);
       }
       fastShutdown("Error occurred.");
       return exitWithError(error as any);

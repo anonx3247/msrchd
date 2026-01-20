@@ -16,6 +16,7 @@ import { Result, err, ok } from "@app/lib/error";
 import { removeNulls } from "@app/lib/utils";
 import { concurrentExecutor } from "@app/lib/async";
 import { assertNever } from "@app/lib/assert";
+import { Advisory } from "@app/runner/advisory";
 
 export type Publication = InferSelectModel<typeof publications>;
 export type Review = InferSelectModel<typeof reviews>;
@@ -318,6 +319,15 @@ export class PublicationResource {
       }
 
       this.data = updated;
+
+      // Notify author of publication status
+      Advisory.push(this.data.author, {
+        type: "publication_status_updated",
+        publicationReference: this.data.reference,
+        publicationTitle: this.data.title,
+        status: "PUBLISHED",
+      });
+
       return ok(this);
     } catch (error) {
       return err(
@@ -344,6 +354,15 @@ export class PublicationResource {
       }
 
       this.data = updated;
+
+      // Notify author of publication status
+      Advisory.push(this.data.author, {
+        type: "publication_status_updated",
+        publicationReference: this.data.reference,
+        publicationTitle: this.data.title,
+        status: "REJECTED",
+      });
+
       return ok(this);
     } catch (error) {
       return err(
@@ -376,6 +395,15 @@ export class PublicationResource {
       .returning();
 
     this.reviews = created;
+
+    // Notify each reviewer that they have been requested to review
+    for (const reviewerIndex of reviewerIndices) {
+      Advisory.push(reviewerIndex, {
+        type: "review_requested",
+        publicationReference: this.data.reference,
+        publicationTitle: this.data.title,
+      });
+    }
 
     return ok(this.reviews);
   }
@@ -416,6 +444,17 @@ export class PublicationResource {
     }
 
     this.reviews[idx] = updated;
+
+    // Notify the publication author that a review was received
+    if (updated.grade) {
+      Advisory.push(this.data.author, {
+        type: "review_received",
+        publicationReference: this.data.reference,
+        publicationTitle: this.data.title,
+        reviewerIndex: reviewerIndex,
+        grade: updated.grade,
+      });
+    }
 
     return ok(this.reviews[idx]);
   }

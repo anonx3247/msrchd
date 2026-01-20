@@ -209,17 +209,15 @@ ${publicationHeader(publication)}
 
 ${content}` +
               "\n\n" +
-              (publication.toJSON().status === "PUBLISHED"
-                ? `\
+              `\
 ${publication
-                  .toJSON()
-                  .reviews.map((r) => {
-                    return `\
+                .toJSON()
+                .reviews.map((r) => {
+                  return `\
 ${reviewHeader(r)}
-${r.content}`;
-                  })
-                  .join("\n\n")}`
-                : "(reviews are hidden until publication/rejection)"),
+${r.content ?? "(pending)"}`;
+                })
+                .join("\n\n")}`,
           },
         ],
       };
