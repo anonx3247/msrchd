@@ -260,6 +260,8 @@ You can search by:
 - **Partial name**: `add_comm` finds all lemmas containing "add_comm"
 - **Function**: `Finset.sum` finds lemmas using that function
 
+**Note:** Very broad queries (like `Nat -> Nat -> Nat`) can timeout. Use specific function or lemma names for best results.
+
 URL-encode spaces as `%20` in queries:
 ```bash
 # Find lemmas about List.length
